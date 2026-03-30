@@ -22,6 +22,8 @@ class ShoppingListScreen extends ConsumerWidget {
     final list = state.list;
     final instacartProvider = _providerById(state.activeProviders, 'instacart');
     final amazonProvider = _providerById(state.activeProviders, 'amazon');
+    final savedResults = state.linksByListId[list?.id ?? ''] ?? state.linkResults;
+    final linkByProviderId = {for (final link in savedResults) link.provider.id: link};
 
     if (list == null || list.items.isEmpty) {
       return const AppScaffold(
@@ -42,6 +44,8 @@ class ShoppingListScreen extends ConsumerWidget {
           if (list.recipeTitle != null) Text('From recipe: ${list.recipeTitle}'),
           const SizedBox(height: 12),
           _ProviderCapabilityCard(providers: state.activeProviders),
+          const SizedBox(height: 8),
+          _ProviderLaunchStateCard(providers: state.activeProviders, linkByProviderId: linkByProviderId),
           const SizedBox(height: 12),
           ...state.groupedItems.entries.map(
             (entry) => _GroupedSection(groupLabel: entry.key, items: entry.value),
@@ -65,6 +69,17 @@ class ShoppingListScreen extends ConsumerWidget {
                 icon: const Icon(Icons.open_in_new),
                 label: const Text('Open Amazon links'),
               ),
+              if (linkByProviderId['instacart']?.checkoutUri != null)
+                OutlinedButton.icon(
+                  onPressed: () => _openLink(
+                    context,
+                    ref,
+                    linkByProviderId['instacart']!.checkoutUri!,
+                    providerName: 'Instacart',
+                  ),
+                  icon: const Icon(Icons.rocket_launch_outlined),
+                  label: const Text('Open last Instacart link'),
+                ),
               OutlinedButton.icon(
                 onPressed: () => _copyList(context, ref),
                 icon: const Icon(Icons.copy_all_outlined),
@@ -259,6 +274,45 @@ class _ProviderCapabilityCard extends StatelessWidget {
                 trailing: Chip(label: Text(provider.capabilityLabel.label)),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProviderLaunchStateCard extends StatelessWidget {
+  const _ProviderLaunchStateCard({required this.providers, required this.linkByProviderId});
+
+  final List<CommerceProvider> providers;
+  final Map<String, ShoppingLinkResult> linkByProviderId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Provider link state', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ...providers.map((provider) {
+              final link = linkByProviderId[provider.id];
+              final hasLaunchable = link?.checkoutUri != null || (link?.itemUris.isNotEmpty ?? false);
+              final subtitle = link == null
+                  ? 'No generated link yet for this list.'
+                  : hasLaunchable
+                      ? 'Ready to open: ${link.message}'
+                      : link.message;
+              return ListTile(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                leading: Icon(hasLaunchable ? Icons.check_circle_outline : Icons.radio_button_unchecked),
+                title: Text(provider.name),
+                subtitle: Text(subtitle),
+              );
+            }),
           ],
         ),
       ),

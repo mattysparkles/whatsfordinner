@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Any, Literal
+from datetime import datetime
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -74,9 +75,30 @@ class ShoppingListItemInput(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
+class InstacartHealthFilterInput(BaseModel):
+    code: str = Field(min_length=1, max_length=64)
+
+
+class InstacartLineItemInput(BaseModel):
+    item_name: str = Field(alias="itemName", min_length=1, max_length=200)
+    quantity: float | None = Field(default=None, ge=0.0, le=10000)
+    unit: str | None = Field(default=None, max_length=64)
+    display_text: str = Field(alias="displayText", min_length=1, max_length=400)
+    health_filters: list[InstacartHealthFilterInput] = Field(default_factory=list, alias="healthFilters")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class InstacartPageType(str):
+    shopping_list = 'shopping_list'
+    recipe = 'recipe'
+
+
 class InstacartLinkRequest(BaseModel):
-    recipe_title: str | None = Field(default=None, alias="recipeTitle")
+    recipe_title: Optional[str] = Field(default=None, alias="recipeTitle")
+    page_type: Optional[Literal['shopping_list', 'recipe']] = Field(default=None, alias="pageType")
     items: list[ShoppingListItemInput] = Field(min_length=1, max_length=200)
+    line_items: Optional[list[InstacartLineItemInput]] = Field(default=None, alias="lineItems")
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -92,6 +114,9 @@ class InstacartLinkRequest(BaseModel):
 class InstacartLinkResponse(BaseModel):
     checkout_url: str = Field(alias="checkoutUrl")
     message: str
+    page_type: Literal['shopping_list', 'recipe'] = Field(alias='pageType')
+    expires_at: datetime | None = Field(default=None, alias='expiresAt')
+    from_cache: bool = Field(alias='fromCache', default=False)
 
     model_config = ConfigDict(populate_by_name=True)
 
