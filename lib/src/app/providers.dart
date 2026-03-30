@@ -103,12 +103,14 @@ class PantryState {
     this.searchQuery = '',
     this.filters = const PantryFilters(),
     this.isLoading = false,
+    this.errorMessage,
   });
 
   final List<PantryItem> items;
   final String searchQuery;
   final PantryFilters filters;
   final bool isLoading;
+  final String? errorMessage;
 
   List<PantryItem> get filteredItems {
     return items.where((item) {
@@ -129,13 +131,28 @@ class PantryState {
     String? searchQuery,
     PantryFilters? filters,
     bool? isLoading,
+    String? errorMessage,
+    bool clearError = false,
   }) {
     return PantryState(
       items: items ?? this.items,
       searchQuery: searchQuery ?? this.searchQuery,
       filters: filters ?? this.filters,
       isLoading: isLoading ?? this.isLoading,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
     );
+  }
+
+  Map<IngredientCategory, List<PantryItem>> get groupedByCategory {
+    final grouped = <IngredientCategory, List<PantryItem>>{};
+    for (final item in filteredItems) {
+      grouped.putIfAbsent(item.ingredient.category, () => <PantryItem>[]).add(item);
+    }
+    final sortedKeys = grouped.keys.toList()..sort((a, b) => a.name.compareTo(b.name));
+    return {
+      for (final key in sortedKeys)
+        key: (grouped[key]!..sort((a, b) => a.ingredient.name.compareTo(b.ingredient.name))),
+    };
   }
 }
 
@@ -148,8 +165,13 @@ class PantryController extends StateNotifier<PantryState> {
   static const _uuid = Uuid();
 
   Future<void> load() async {
-    final items = await _repo.fetchAll();
-    state = state.copyWith(items: items, isLoading: false);
+    state = state.copyWith(isLoading: true, clearError: true);
+    try {
+      final items = await _repo.fetchAll();
+      state = state.copyWith(items: items, isLoading: false, clearError: true);
+    } catch (error) {
+      state = state.copyWith(isLoading: false, errorMessage: 'Unable to load pantry items. ${error.toString()}');
+    }
   }
 
   Future<void> addOrUpdateItem({
@@ -162,38 +184,65 @@ class PantryController extends StateNotifier<PantryState> {
     double confidence = 1,
     FreshnessState freshnessState = FreshnessState.unknown,
   }) async {
-    final now = DateTime.now();
-    final ingredientId = id == null ? _uuid.v4() : state.items.firstWhere((item) => item.id == id).ingredient.id;
-    final item = PantryItem(
-      id: id ?? _uuid.v4(),
-      ingredient: Ingredient(
-        id: ingredientId,
-        name: ingredientName.trim(),
-        normalizedName: ingredientName.trim().toLowerCase(),
-        category: category,
-      ),
-      quantityInfo: QuantityInfo(amount: amount, unit: (unit == null || unit.trim().isEmpty) ? null : unit.trim()),
-      sourceType: sourceType,
-      confidence: confidence,
-      freshnessState: freshnessState,
-      createdAt: id == null ? now : state.items.firstWhere((item) => item.id == id).createdAt,
-      updatedAt: now,
-    );
-    await _repo.upsert(item);
-    await load();
+    try {
+      final now = DateTime.now();
+      final ingredientId = id == null ? _uuid.v4() : state.items.firstWhere((item) => item.id == id).ingredient.id;
+      final item = PantryItem(
+        id: id ?? _uuid.v4(),
+        ingredient: Ingredient(
+          id: ingredientId,
+          name: ingredientName.trim(),
+          normalizedName: ingredientName.trim().toLowerCase(),
+          category: category,
+        ),
+        quantityInfo: QuantityInfo(amount: amount, unit: (unit == null || unit.trim().isEmpty) ? null : unit.trim()),
+        sourceType: sourceType,
+        confidence: confidence,
+        freshnessState: freshnessState,
+        createdAt: id == null ? now : state.items.firstWhere((item) => item.id == id).createdAt,
+        updatedAt: now,
+      );
+      await _repo.upsert(item);
+      await load();
+    } catch (error) {
+      state = state.copyWith(errorMessage: 'Unable to save pantry item. ${error.toString()}');
+    }
   }
 
   Future<void> deleteItem(String id) async {
-    await _repo.deleteById(id);
-    await load();
+    try {
+      await _repo.deleteById(id);
+      await load();
+    } catch (error) {
+      state = state.copyWith(errorMessage: 'Unable to delete pantry item. ${error.toString()}');
+    }
   }
 
   void setSearchQuery(String query) => state = state.copyWith(searchQuery: query);
+  void clearError() => state = state.copyWith(clearError: true);
+  void setSourceFilter(PantrySourceType? sourceType) => state = state.copyWith(
+    filters: state.filters.copyWith(sourceType: sourceType, clearSource: sourceType == null),
+  );
+  void setFreshnessFilter(FreshnessState? freshness) => state = state.copyWith(
+    filters: state.filters.copyWith(freshnessState: freshness, clearFreshness: freshness == null),
+  );
+  void setCategoryFilter(IngredientCategory? category) => state = state.copyWith(
+    filters: state.filters.copyWith(category: category, clearCategory: category == null),
+  );
 
   Future<String> exportJsonPlaceholder() => _repo.exportToJson();
 
   Future<void> importJsonPlaceholder(String jsonPayload) async {
-    await _repo.importFromJson(jsonPayload);
+    try {
+      await _repo.importFromJson(jsonPayload);
+      await load();
+    } catch (error) {
+      state = state.copyWith(errorMessage: 'Unable to import pantry data. ${error.toString()}');
+    }
+  }
+
+  Future<void> resetWithSampleData() async {
+    await _repo.saveAll(_samplePantryItems());
     await load();
   }
 }
@@ -205,6 +254,35 @@ final pantryControllerProvider = StateNotifierProvider<PantryController, PantryS
 final pantryQuickAddSuggestionsProvider = Provider<List<String>>((ref) {
   return const ['Eggs', 'Milk', 'Butter', 'Olive oil', 'Garlic', 'Onion', 'Rice', 'Pasta', 'Spinach', 'Tomatoes'];
 });
+
+List<PantryItem> _samplePantryItems() {
+  const nowYear = 2026;
+  return [
+    PantryItem(
+      id: 'sample-pasta',
+      ingredient: const Ingredient(id: 'ingredient-pasta', name: 'Pasta', category: IngredientCategory.grainsBread),
+      quantityInfo: const QuantityInfo(amount: 1, unit: 'box'),
+      createdAt: DateTime(nowYear, 3, 1),
+      updatedAt: DateTime(nowYear, 3, 1),
+    ),
+    PantryItem(
+      id: 'sample-tomatoes',
+      ingredient: const Ingredient(id: 'ingredient-tomatoes', name: 'Tomatoes', category: IngredientCategory.cannedJarred),
+      quantityInfo: const QuantityInfo(amount: 2, unit: 'cans'),
+      sourceType: PantrySourceType.aiImport,
+      confidence: 0.84,
+      createdAt: DateTime(nowYear, 3, 2),
+      updatedAt: DateTime(nowYear, 3, 2),
+    ),
+    PantryItem(
+      id: 'sample-garlic',
+      ingredient: const Ingredient(id: 'ingredient-garlic', name: 'Garlic', category: IngredientCategory.produce),
+      quantityInfo: const QuantityInfo(amount: 1, unit: 'head'),
+      createdAt: DateTime(nowYear, 3, 3),
+      updatedAt: DateTime(nowYear, 3, 3),
+    ),
+  ];
+}
 
 class RecipeDiscoveryState {
   const RecipeDiscoveryState({
@@ -343,6 +421,8 @@ final shoppingProvidersProvider = Provider<List<core.CommerceProvider>>((ref) {
 final shoppingListControllerProvider = StateNotifierProvider<ShoppingListController, ShoppingListState>(
   (ref) => ShoppingListController(providers: ref.watch(shoppingProvidersProvider)),
 );
+
+final shoppingLinkGenerationStateProvider = StateProvider<AsyncValue<void>>((_) => const AsyncData(null));
 
 final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
   final service = MockSubscriptionService();

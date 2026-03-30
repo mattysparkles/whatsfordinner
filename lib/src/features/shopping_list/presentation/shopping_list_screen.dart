@@ -13,6 +13,7 @@ class ShoppingListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(shoppingListControllerProvider);
+    final linkGenerationState = ref.watch(shoppingLinkGenerationStateProvider);
     final list = state.list;
 
     if (list == null || list.items.isEmpty) {
@@ -65,6 +66,22 @@ class ShoppingListScreen extends ConsumerWidget {
               ),
             ],
           ),
+          if (linkGenerationState.isLoading) ...[
+            const SizedBox(height: 12),
+            const LinearProgressIndicator(),
+            const SizedBox(height: 8),
+            const Text('Generating shopping links...'),
+          ],
+          if (linkGenerationState.hasError) ...[
+            const SizedBox(height: 12),
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text('Link generation failed. ${linkGenerationState.error}'),
+              ),
+            ),
+          ],
           if (state.linkResults.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text('Generated links', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -84,12 +101,18 @@ class ShoppingListScreen extends ConsumerWidget {
     final state = ref.read(shoppingListControllerProvider);
     final list = state.list;
     if (list == null) return;
-    final provider = state.activeProviders.firstWhere((item) => item.id == providerId);
-    final service = ref.read(shoppingLinkServiceProvider);
-    final result = await service.buildLinks(list: list, providers: [provider]);
-    ref.read(shoppingListControllerProvider.notifier).setLinkResults(result);
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Built ${provider.name} shopping links.')));
+    ref.read(shoppingLinkGenerationStateProvider.notifier).state = const AsyncLoading<void>();
+    try {
+      final provider = state.activeProviders.firstWhere((item) => item.id == providerId);
+      final service = ref.read(shoppingLinkServiceProvider);
+      final result = await service.buildLinks(list: list, providers: [provider]);
+      ref.read(shoppingListControllerProvider.notifier).setLinkResults(result);
+      ref.read(shoppingLinkGenerationStateProvider.notifier).state = const AsyncData(null);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Built ${provider.name} shopping links.')));
+      }
+    } catch (error, stackTrace) {
+      ref.read(shoppingLinkGenerationStateProvider.notifier).state = AsyncError(error, stackTrace);
     }
   }
 
