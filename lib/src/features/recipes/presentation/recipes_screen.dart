@@ -6,6 +6,8 @@ import '../../../app/app_routes.dart';
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../monetization/domain/ad_placement.dart';
+import '../../monetization/presentation/widgets/monetization_widgets.dart';
 
 class RecipesScreen extends ConsumerWidget {
   const RecipesScreen({super.key});
@@ -17,6 +19,7 @@ class RecipesScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Recipe suggestions',
+      adPlacement: AdPlacement.homeBanner,
       body: suggestionsAsync.when(
         data: (recipes) {
           final bestMatches = recipes.where((r) => r.matchType == RecipeMatchType.exact).toList(growable: false);
@@ -49,7 +52,7 @@ class RecipesScreen extends ConsumerWidget {
                 Expanded(
                   child: TabBarView(
                     children: [
-                      _RecipeList(recipes: bestMatches),
+                      _RecipeList(recipes: bestMatches, showNativeAd: true),
                       _RecipeList(recipes: almostThere),
                       _RecipeList(recipes: freestyle),
                     ],
@@ -67,9 +70,10 @@ class RecipesScreen extends ConsumerWidget {
 }
 
 class _RecipeList extends StatelessWidget {
-  const _RecipeList({required this.recipes});
+  const _RecipeList({required this.recipes, this.showNativeAd = false});
 
   final List<RecipeSuggestion> recipes;
+  final bool showNativeAd;
 
   @override
   Widget build(BuildContext context) {
@@ -77,8 +81,17 @@ class _RecipeList extends StatelessWidget {
       return const Center(child: Text('No suggestions yet for this category.'));
     }
     return ListView.builder(
-      itemCount: recipes.length,
-      itemBuilder: (context, index) => _RecipeCard(recipe: recipes[index]),
+      itemCount: recipes.length + (showNativeAd ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (showNativeAd && index == 0) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 4),
+            child: AdPlacementSlot(placement: AdPlacement.recipesNative),
+          );
+        }
+        final recipeIndex = showNativeAd ? index - 1 : index;
+        return _RecipeCard(recipe: recipes[recipeIndex]);
+      },
     );
   }
 }

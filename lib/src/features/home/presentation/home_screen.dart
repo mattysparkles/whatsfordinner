@@ -6,6 +6,9 @@ import '../../../app/app_routes.dart';
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../monetization/domain/ad_placement.dart';
+import '../../monetization/domain/entitlements.dart';
+import '../../monetization/presentation/widgets/monetization_widgets.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -19,6 +22,7 @@ class HomeScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'PantryPilot',
+      adPlacement: AdPlacement.homeBanner,
       actions: [
         IconButton(
           onPressed: () => context.push(AppRoutes.preferences),
@@ -101,6 +105,11 @@ class HomeScreen extends ConsumerWidget {
           _NavigationTile(label: 'Shopping list', route: AppRoutes.shoppingList),
           _NavigationTile(label: 'Favorites & history', route: AppRoutes.favoritesHistory),
           _NavigationTile(label: 'Premium & monetization', route: AppRoutes.monetization),
+          const LockedFeatureTile(
+            feature: PremiumFeature.premiumAiChefMode,
+            title: 'Premium AI chef mode',
+            subtitle: 'Hands-on adaptive chef guidance (coming later)',
+          ),
         ],
       ),
     );
