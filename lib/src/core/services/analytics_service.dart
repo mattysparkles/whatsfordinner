@@ -16,6 +16,11 @@ enum AppAnalyticsEvent {
   cookModeCompleted,
   shoppingHandoffStarted,
   premiumUpsellViewed,
+  paywallViewed,
+  purchaseStarted,
+  purchaseSucceeded,
+  purchaseRestore,
+  adImpression,
 }
 
 class DebugAnalyticsService implements AnalyticsService {

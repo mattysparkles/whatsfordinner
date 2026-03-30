@@ -13,7 +13,7 @@ class AboutScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AppScaffold(
       title: 'About PantryPilot',
-      adPlacement: AdPlacement.rewardsPrompt,
+      adPlacement: AdPlacement.homeBanner,
       body: ListView(
         children: const [
           ListTile(

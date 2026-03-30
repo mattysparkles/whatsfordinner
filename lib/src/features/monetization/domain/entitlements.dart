@@ -21,8 +21,12 @@ class EntitlementSet {
 class EntitlementPolicy {
   const EntitlementPolicy();
 
+  static const premiumEntitlementId = 'pantrypilot_premium';
+  static const monthlyProductId = 'pantrypilot_premium_monthly';
+  static const yearlyProductId = 'pantrypilot_premium_yearly';
+
   EntitlementSet resolve(SubscriptionState state) {
-    if (!state.isPremium) {
+    if (!state.isPremium || !_isKnownPremiumProduct(state.productId)) {
       return const EntitlementSet({});
     }
 
@@ -33,5 +37,10 @@ class EntitlementPolicy {
       PremiumFeature.advancedHouseholdProfiles,
       PremiumFeature.premiumAiChefMode,
     });
+  }
+
+  bool _isKnownPremiumProduct(String? productId) {
+    if (productId == null) return true;
+    return productId == monthlyProductId || productId == yearlyProductId;
   }
 }

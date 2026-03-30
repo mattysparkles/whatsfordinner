@@ -10,7 +10,7 @@ class TermsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const AppScaffold(
       title: 'Terms of service',
-      adPlacement: AdPlacement.rewardsPrompt,
+      adPlacement: AdPlacement.homeBanner,
       body: Padding(
         padding: EdgeInsets.all(16),
         child: Text(
