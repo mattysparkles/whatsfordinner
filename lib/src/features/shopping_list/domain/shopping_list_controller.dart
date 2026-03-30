@@ -8,11 +8,13 @@ class ShoppingListState {
     this.list,
     this.activeProviders = const [],
     this.linkResults = const [],
+    this.linksByListId = const {},
   });
 
   final ShoppingList? list;
   final List<CommerceProvider> activeProviders;
   final List<ShoppingLinkResult> linkResults;
+  final Map<String, List<ShoppingLinkResult>> linksByListId;
 
   bool get hasList => list != null && list!.items.isNotEmpty;
 
@@ -34,12 +36,14 @@ class ShoppingListState {
     ShoppingList? list,
     List<CommerceProvider>? activeProviders,
     List<ShoppingLinkResult>? linkResults,
+    Map<String, List<ShoppingLinkResult>>? linksByListId,
     bool clearList = false,
   }) {
     return ShoppingListState(
       list: clearList ? null : (list ?? this.list),
       activeProviders: activeProviders ?? this.activeProviders,
       linkResults: linkResults ?? this.linkResults,
+      linksByListId: linksByListId ?? this.linksByListId,
     );
   }
 }
@@ -51,17 +55,32 @@ class ShoppingListController extends StateNotifier<ShoppingListState> {
   static const _uuid = Uuid();
 
   void createFromRecipe(RecipeSuggestion recipe) {
-    final items = recipe.missingIngredients
-        .map(
-          (ingredient) => ShoppingListItem(
-            id: _uuid.v4(),
-            ingredientName: ingredient.ingredientName,
-            groupLabel: _inferGroup(ingredient.ingredientName),
-            quantity: ingredient.shortageAmount,
-            unit: ingredient.unit,
-          ),
-        )
-        .toList(growable: false);
+    final mergedByName = <String, ShoppingListItem>{};
+    for (final ingredient in recipe.missingIngredients) {
+      final normalized = ingredient.ingredientName.trim().toLowerCase();
+      final existing = mergedByName[normalized];
+      final inferredNote = ingredient.suggestedSubstitutions.isEmpty
+          ? null
+          : 'Substitutions: ${ingredient.suggestedSubstitutions.join(', ')}';
+      if (existing == null) {
+        mergedByName[normalized] = ShoppingListItem(
+          id: _uuid.v4(),
+          ingredientName: ingredient.ingredientName.trim(),
+          groupLabel: _inferGroup(ingredient.ingredientName),
+          quantity: ingredient.shortageAmount,
+          unit: ingredient.unit,
+          note: inferredNote,
+        );
+        continue;
+      }
+
+      final sameUnit = existing.unit?.trim().toLowerCase() == ingredient.unit?.trim().toLowerCase();
+      mergedByName[normalized] = existing.copyWith(
+        quantity: sameUnit ? (existing.quantity ?? 0) + (ingredient.shortageAmount ?? 0) : existing.quantity,
+        note: _mergeNotes(existing.note, inferredNote),
+      );
+    }
+    final items = mergedByName.values.toList(growable: false);
 
     state = state.copyWith(
       list: ShoppingList(
@@ -125,15 +144,35 @@ class ShoppingListController extends StateNotifier<ShoppingListState> {
   }
 
   void setLinkResults(List<ShoppingLinkResult> links) {
-    state = state.copyWith(linkResults: links);
+    final listId = state.list?.id;
+    if (listId == null) {
+      state = state.copyWith(linkResults: links);
+      return;
+    }
+
+    final nextMap = {...state.linksByListId, listId: links};
+    state = state.copyWith(linkResults: links, linksByListId: nextMap);
   }
 
   static String _inferGroup(String name) {
     final value = name.toLowerCase();
-    if (['lettuce', 'onion', 'garlic', 'spinach', 'pepper', 'tomato'].any(value.contains)) return 'Produce';
-    if (['milk', 'cheese', 'butter', 'yogurt', 'egg'].any(value.contains)) return 'Dairy & Eggs';
-    if (['beef', 'chicken', 'fish', 'shrimp', 'salmon'].any(value.contains)) return 'Protein';
-    if (['rice', 'pasta', 'bread', 'tortilla', 'flour'].any(value.contains)) return 'Pantry & Grains';
+    if (['lettuce', 'onion', 'garlic', 'spinach', 'pepper', 'tomato', 'lemon', 'lime', 'cilantro', 'potato']
+        .any(value.contains)) {
+      return 'Produce';
+    }
+    if (['milk', 'cheese', 'butter', 'yogurt', 'egg', 'cream'].any(value.contains)) return 'Dairy & Eggs';
+    if (['beef', 'chicken', 'fish', 'shrimp', 'salmon', 'pork', 'turkey'].any(value.contains)) return 'Protein';
+    if (['rice', 'pasta', 'bread', 'tortilla', 'flour', 'salt', 'sugar', 'oil', 'vinegar', 'spice']
+        .any(value.contains)) {
+      return 'Pantry & Grains';
+    }
+    if (['frozen', 'ice cream'].any(value.contains)) return 'Frozen';
     return 'Other';
+  }
+
+  static String? _mergeNotes(String? a, String? b) {
+    final values = [a?.trim(), b?.trim()].whereType<String>().where((value) => value.isNotEmpty).toSet().toList();
+    if (values.isEmpty) return null;
+    return values.join(' • ');
   }
 }

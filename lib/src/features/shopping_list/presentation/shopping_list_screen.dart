@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
@@ -14,7 +16,10 @@ class ShoppingListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(shoppingListControllerProvider);
     final linkGenerationState = ref.watch(shoppingLinkGenerationStateProvider);
+    final launchState = ref.watch(shoppingLinkLaunchStateProvider);
     final list = state.list;
+    final instacartProvider = _providerById(state.activeProviders, 'instacart');
+    final amazonProvider = _providerById(state.activeProviders, 'amazon');
 
     if (list == null || list.items.isEmpty) {
       return const AppScaffold(
@@ -45,12 +50,16 @@ class ShoppingListScreen extends ConsumerWidget {
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: () => _generateLinks(context, ref, providerId: 'instacart'),
+                onPressed: instacartProvider?.capabilityLabel == ProviderCapabilityLabel.active
+                    ? () => _generateLinks(context, ref, providerId: 'instacart')
+                    : null,
                 icon: const Icon(Icons.local_shipping_outlined),
                 label: const Text('Order with Instacart'),
               ),
               OutlinedButton.icon(
-                onPressed: () => _generateLinks(context, ref, providerId: 'amazon'),
+                onPressed: amazonProvider?.capabilityLabel == ProviderCapabilityLabel.active
+                    ? () => _generateLinks(context, ref, providerId: 'amazon')
+                    : null,
                 icon: const Icon(Icons.open_in_new),
                 label: const Text('Open Amazon links'),
               ),
@@ -82,6 +91,16 @@ class ShoppingListScreen extends ConsumerWidget {
               ),
             ),
           ],
+          if (launchState != null) ...[
+            const SizedBox(height: 12),
+            Card(
+              color: launchState.$1 ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Text(launchState.$2),
+              ),
+            ),
+          ],
           if (state.linkResults.isNotEmpty) ...[
             const SizedBox(height: 16),
             const Text('Generated links', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -89,12 +108,36 @@ class ShoppingListScreen extends ConsumerWidget {
                   leading: Icon(link.canOpenNow ? Icons.check_circle_outline : Icons.schedule),
                   title: Text(link.provider.name),
                   subtitle: Text(link.message),
-                  trailing: link.checkoutUri != null ? Text(link.checkoutUri.toString(), textAlign: TextAlign.end) : null,
+                  trailing: link.checkoutUri != null
+                      ? IconButton(
+                          icon: const Icon(Icons.launch),
+                          tooltip: 'Open provider link',
+                          onPressed: () => _openLink(context, ref, link.checkoutUri!, providerName: link.provider.name),
+                        )
+                      : null,
                 )),
+            ...state.linkResults.expand(
+              (link) => link.itemUris.map(
+                (itemUri) => ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.link),
+                  title: Text(itemUri.toString(), maxLines: 1, overflow: TextOverflow.ellipsis),
+                  subtitle: Text('${link.provider.name} item link'),
+                  onTap: () => _openLink(context, ref, itemUri, providerName: link.provider.name),
+                ),
+              ),
+            ),
           ],
         ],
       ),
     );
+  }
+
+  CommerceProvider? _providerById(List<CommerceProvider> providers, String id) {
+    for (final provider in providers) {
+      if (provider.id == id) return provider;
+    }
+    return null;
   }
 
   Future<void> _generateLinks(BuildContext context, WidgetRef ref, {required String providerId}) async {
@@ -104,6 +147,13 @@ class ShoppingListScreen extends ConsumerWidget {
     ref.read(shoppingLinkGenerationStateProvider.notifier).state = const AsyncLoading<void>();
     try {
       final provider = state.activeProviders.firstWhere((item) => item.id == providerId);
+      if (provider.capabilityLabel != ProviderCapabilityLabel.active) {
+        ref.read(shoppingLinkLaunchStateProvider.notifier).state = (
+          false,
+          '${provider.name} is configured but currently unavailable in this build.',
+        );
+        return;
+      }
       final service = ref.read(shoppingLinkServiceProvider);
       final result = await service.buildLinks(list: list, providers: [provider]);
       ref.read(shoppingListControllerProvider.notifier).setLinkResults(result);
@@ -126,12 +176,24 @@ class ShoppingListScreen extends ConsumerWidget {
 
   Future<void> _shareList(BuildContext context, WidgetRef ref) async {
     final text = _listAsText(ref.read(shoppingListControllerProvider).list);
-    await Clipboard.setData(ClipboardData(text: text));
+    await Share.share(text, subject: 'PantryPilot shopping list');
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Share sheet integration is coming later. List copied so you can paste it anywhere.'),
+          content: Text('Opened share sheet. Recipients can shop from the list in their own apps.'),
         ),
+      );
+    }
+  }
+
+  Future<void> _openLink(BuildContext context, WidgetRef ref, Uri uri, {required String providerName}) async {
+    final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (success) {
+      ref.read(shoppingLinkLaunchStateProvider.notifier).state = (true, 'Opened $providerName successfully.');
+    } else {
+      ref.read(shoppingLinkLaunchStateProvider.notifier).state = (
+        false,
+        'Could not open $providerName link on this device.',
       );
     }
   }

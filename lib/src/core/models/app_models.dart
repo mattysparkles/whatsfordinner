@@ -337,11 +337,13 @@ class HistoryEvent {
 }
 
 enum ProviderCapabilityLabel {
-  availableNow,
+  active,
+  configuredButUnavailable,
   comingLater;
 
   String get label => switch (this) {
-        ProviderCapabilityLabel.availableNow => 'Available now',
+        ProviderCapabilityLabel.active => 'Active',
+        ProviderCapabilityLabel.configuredButUnavailable => 'Configured, unavailable',
         ProviderCapabilityLabel.comingLater => 'Coming later',
       };
 }

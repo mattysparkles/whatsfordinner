@@ -9,7 +9,7 @@ void main() {
         CommerceProvider(
           id: 'instacart',
           name: 'Instacart',
-          capabilityLabel: ProviderCapabilityLabel.availableNow,
+          capabilityLabel: ProviderCapabilityLabel.active,
         ),
       ],
     );
@@ -29,7 +29,13 @@ void main() {
       dietaryTags: [],
       requirements: [],
       missingIngredients: [
-        MissingIngredient(ingredientName: 'Onion', shortageAmount: 1, unit: 'count'),
+        MissingIngredient(
+          ingredientName: 'Onion',
+          shortageAmount: 1,
+          unit: 'count',
+          suggestedSubstitutions: ['shallot'],
+        ),
+        MissingIngredient(ingredientName: 'Onion', shortageAmount: 0.5, unit: 'count'),
         MissingIngredient(ingredientName: 'Milk', shortageAmount: 1, unit: 'cup'),
       ],
       availableIngredients: [],
@@ -45,6 +51,8 @@ void main() {
     expect(controller.state.groupedItems.keys, containsAll(['Produce', 'Dairy & Eggs']));
 
     final onion = list.items.firstWhere((item) => item.ingredientName == 'Onion');
+    expect(onion.quantity, 1.5);
+    expect(onion.note, contains('shallot'));
     controller.toggleChecked(onion.id);
     controller.updateQuantity(onion.id, '2');
     controller.updateNotes(onion.id, 'yellow preferred');
