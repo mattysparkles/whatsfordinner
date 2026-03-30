@@ -13,6 +13,10 @@ enum MealType {
 
 enum CaptureCategory { pantry, fridge, freezer, spiceRack, groceryScreenshot }
 
+enum CaptureInputMethod { camera, photoLibrary, screenshotUpload }
+
+enum ParseConfidence { likely, possible, unclear }
+
 enum IngredientCategory {
   produce,
   dairy,
@@ -204,17 +208,106 @@ class PantryItem {
 }
 
 class CapturedImage {
-  const CapturedImage({required this.id, required this.path, required this.category});
+  const CapturedImage({
+    required this.id,
+    required this.path,
+    required this.category,
+    this.inputMethod = CaptureInputMethod.photoLibrary,
+    this.createdAt,
+    this.errorMessage,
+  });
+
   final String id;
   final String path;
   final CaptureCategory category;
+  final CaptureInputMethod inputMethod;
+  final DateTime? createdAt;
+  final String? errorMessage;
+
+  CapturedImage copyWith({
+    String? id,
+    String? path,
+    CaptureCategory? category,
+    CaptureInputMethod? inputMethod,
+    DateTime? createdAt,
+    String? errorMessage,
+    bool clearError = false,
+  }) {
+    return CapturedImage(
+      id: id ?? this.id,
+      path: path ?? this.path,
+      category: category ?? this.category,
+      inputMethod: inputMethod ?? this.inputMethod,
+      createdAt: createdAt ?? this.createdAt,
+      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+    );
+  }
 }
 
 class ParsedIngredient {
-  const ParsedIngredient({required this.rawText, required this.suggestedName, required this.confidence});
+  const ParsedIngredient({
+    required this.id,
+    required this.rawText,
+    required this.suggestedName,
+    required this.confidenceScore,
+    required this.parseConfidence,
+    required this.sourceImageId,
+    this.category = IngredientCategory.other,
+    this.whyDetected = 'Why we think this is here: placeholder explanation pending real AI integration.',
+    this.approved = true,
+  });
+
+  final String id;
   final String rawText;
   final String suggestedName;
-  final double confidence;
+  final double confidenceScore;
+  final ParseConfidence parseConfidence;
+  final String sourceImageId;
+  final IngredientCategory category;
+  final String whyDetected;
+  final bool approved;
+
+  ParsedIngredient copyWith({
+    String? id,
+    String? rawText,
+    String? suggestedName,
+    double? confidenceScore,
+    ParseConfidence? parseConfidence,
+    String? sourceImageId,
+    IngredientCategory? category,
+    String? whyDetected,
+    bool? approved,
+  }) {
+    return ParsedIngredient(
+      id: id ?? this.id,
+      rawText: rawText ?? this.rawText,
+      suggestedName: suggestedName ?? this.suggestedName,
+      confidenceScore: confidenceScore ?? this.confidenceScore,
+      parseConfidence: parseConfidence ?? this.parseConfidence,
+      sourceImageId: sourceImageId ?? this.sourceImageId,
+      category: category ?? this.category,
+      whyDetected: whyDetected ?? this.whyDetected,
+      approved: approved ?? this.approved,
+    );
+  }
+}
+
+class ParseSession {
+  const ParseSession({
+    required this.id,
+    required this.images,
+    required this.parsedIngredients,
+    this.imageErrors = const [],
+    this.createdAt,
+  });
+
+  final String id;
+  final List<CapturedImage> images;
+  final List<ParsedIngredient> parsedIngredients;
+  final List<String> imageErrors;
+  final DateTime? createdAt;
+
+  bool get hasRecoverableErrors => imageErrors.isNotEmpty;
 }
 
 class RecipeIngredientRequirement {
