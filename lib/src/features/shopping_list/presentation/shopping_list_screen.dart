@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../monetization/domain/ad_placement.dart';
 
 class ShoppingListScreen extends ConsumerWidget {
   const ShoppingListScreen({super.key});
@@ -17,6 +18,7 @@ class ShoppingListScreen extends ConsumerWidget {
     if (list == null || list.items.isEmpty) {
       return const AppScaffold(
         title: 'Shopping List',
+        adPlacement: AdPlacement.shoppingBanner,
         body: Center(
           child: Text('No shopping list yet. Add missing ingredients from a recipe first.'),
         ),
@@ -25,6 +27,7 @@ class ShoppingListScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Shopping List',
+      adPlacement: AdPlacement.shoppingBanner,
       body: ListView(
         children: [
           Text(list.title, style: Theme.of(context).textTheme.titleLarge),

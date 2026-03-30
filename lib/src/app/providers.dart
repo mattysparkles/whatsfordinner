@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -12,6 +14,12 @@ import '../core/services/vision_service.dart';
 import '../domain/models/models.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
 import '../features/cook_mode/infrastructure/mock/mock_cook_mode_services.dart';
+import '../features/monetization/domain/ad_placement.dart';
+import '../features/monetization/domain/entitlements.dart';
+import '../features/monetization/domain/subscription_state.dart';
+import '../features/monetization/infrastructure/mock/mock_monetization_services.dart';
+import '../features/monetization/services/ad_service.dart';
+import '../features/monetization/services/subscription_service.dart';
 import '../features/shopping_list/domain/shopping_list_controller.dart';
 import '../features/shopping_list/domain/shopping_services.dart';
 import '../features/shopping_list/infrastructure/mock/mock_shopping_link_service.dart';
@@ -335,3 +343,71 @@ final shoppingProvidersProvider = Provider<List<core.CommerceProvider>>((ref) {
 final shoppingListControllerProvider = StateNotifierProvider<ShoppingListController, ShoppingListState>(
   (ref) => ShoppingListController(providers: ref.watch(shoppingProvidersProvider)),
 );
+
+final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
+  final service = MockSubscriptionService();
+  ref.onDispose(service.dispose);
+  return service;
+});
+
+final adServiceProvider = Provider<AdService>((ref) => const MockAdService());
+
+class SubscriptionController extends StateNotifier<SubscriptionState> {
+  SubscriptionController(this._service) : super(SubscriptionState.free()) {
+    _init();
+  }
+
+  final SubscriptionService _service;
+  StreamSubscription<SubscriptionState>? _subscription;
+
+  Future<void> _init() async {
+    state = await _service.fetchCurrent();
+    _subscription = _service.watchSubscription().listen((next) => state = next);
+  }
+
+  Future<void> upgradeToPremium() => _service.startPremiumCheckout();
+
+  Future<void> restorePurchases() => _service.restorePurchases();
+
+  Future<void> downgradeToFree() async {
+    final service = _service;
+    if (service is MockSubscriptionService) {
+      await service.debugDowngradeToFree();
+    }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+}
+
+final subscriptionControllerProvider = StateNotifierProvider<SubscriptionController, SubscriptionState>(
+  (ref) => SubscriptionController(ref.watch(subscriptionServiceProvider)),
+);
+
+class MonetizationPolicy {
+  MonetizationPolicy({
+    required this.subscription,
+    required this.entitlements,
+    required this.adService,
+  });
+
+  final SubscriptionState subscription;
+  final EntitlementSet entitlements;
+  final AdService adService;
+
+  bool hasFeature(PremiumFeature feature) => entitlements.has(feature);
+
+  bool shouldShowAd(AdPlacement placement) {
+    return adService.canRenderPlacement(placement: placement, subscription: subscription);
+  }
+}
+
+final monetizationPolicyProvider = Provider<MonetizationPolicy>((ref) {
+  final subscription = ref.watch(subscriptionControllerProvider);
+  final entitlements = const EntitlementPolicy().resolve(subscription);
+  final adService = ref.watch(adServiceProvider);
+  return MonetizationPolicy(subscription: subscription, entitlements: entitlements, adService: adService);
+});
