@@ -68,6 +68,7 @@ class RecipeDetailScreen extends ConsumerWidget {
               ),
               OutlinedButton.icon(
                 onPressed: () {
+                  ref.read(shoppingListControllerProvider.notifier).createFromRecipe(recipe);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added missing ingredients to shopping list.')));
                   context.push(AppRoutes.shoppingList);
                 },

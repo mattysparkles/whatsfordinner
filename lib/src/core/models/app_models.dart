@@ -186,3 +186,126 @@ class SavedRecipe {
   final String recipeId;
   final DateTime savedAt;
 }
+
+enum ProviderCapabilityLabel {
+  availableNow,
+  comingLater;
+
+  String get label => switch (this) {
+        ProviderCapabilityLabel.availableNow => 'Available now',
+        ProviderCapabilityLabel.comingLater => 'Coming later',
+      };
+}
+
+class CommerceProvider {
+  const CommerceProvider({
+    required this.id,
+    required this.name,
+    required this.capabilityLabel,
+    this.supportsAffiliateTracking = false,
+    this.notes,
+  });
+
+  final String id;
+  final String name;
+  final ProviderCapabilityLabel capabilityLabel;
+  final bool supportsAffiliateTracking;
+  final String? notes;
+}
+
+class ShoppingListItem {
+  const ShoppingListItem({
+    required this.id,
+    required this.ingredientName,
+    required this.groupLabel,
+    this.quantity,
+    this.unit,
+    this.note,
+    this.isChecked = false,
+  });
+
+  final String id;
+  final String ingredientName;
+  final String groupLabel;
+  final double? quantity;
+  final String? unit;
+  final String? note;
+  final bool isChecked;
+
+  ShoppingListItem copyWith({
+    String? id,
+    String? ingredientName,
+    String? groupLabel,
+    double? quantity,
+    String? unit,
+    String? note,
+    bool? isChecked,
+    bool clearQuantity = false,
+    bool clearUnit = false,
+    bool clearNote = false,
+  }) {
+    return ShoppingListItem(
+      id: id ?? this.id,
+      ingredientName: ingredientName ?? this.ingredientName,
+      groupLabel: groupLabel ?? this.groupLabel,
+      quantity: clearQuantity ? null : (quantity ?? this.quantity),
+      unit: clearUnit ? null : (unit ?? this.unit),
+      note: clearNote ? null : (note ?? this.note),
+      isChecked: isChecked ?? this.isChecked,
+    );
+  }
+}
+
+class ShoppingList {
+  const ShoppingList({
+    required this.id,
+    required this.title,
+    required this.items,
+    required this.createdAt,
+    this.recipeId,
+    this.recipeTitle,
+  });
+
+  final String id;
+  final String title;
+  final DateTime createdAt;
+  final String? recipeId;
+  final String? recipeTitle;
+  final List<ShoppingListItem> items;
+
+  ShoppingList copyWith({
+    String? id,
+    String? title,
+    DateTime? createdAt,
+    String? recipeId,
+    String? recipeTitle,
+    List<ShoppingListItem>? items,
+    bool clearRecipeId = false,
+    bool clearRecipeTitle = false,
+  }) {
+    return ShoppingList(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      createdAt: createdAt ?? this.createdAt,
+      recipeId: clearRecipeId ? null : (recipeId ?? this.recipeId),
+      recipeTitle: clearRecipeTitle ? null : (recipeTitle ?? this.recipeTitle),
+      items: items ?? this.items,
+    );
+  }
+}
+
+class ShoppingLinkResult {
+  const ShoppingLinkResult({
+    required this.provider,
+    required this.message,
+    this.checkoutUri,
+    this.itemUris = const [],
+    this.canOpenNow = true,
+  });
+
+  final CommerceProvider provider;
+  final Uri? checkoutUri;
+  final List<Uri> itemUris;
+  final String message;
+  final bool canOpenNow;
+}
