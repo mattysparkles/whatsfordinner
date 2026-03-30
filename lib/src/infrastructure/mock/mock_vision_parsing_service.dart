@@ -14,13 +14,8 @@ class MockVisionParsingService implements VisionParsingService {
     final imageErrors = <String>[];
 
     for (final image in images) {
-      final lowerPath = image.path.toLowerCase();
-      if (lowerPath.contains('blurry')) {
-        imageErrors.add('Image "${image.path}" appears blurry. Please retake in better light.');
-        continue;
-      }
-      if (lowerPath.contains('empty')) {
-        imageErrors.add('Image "${image.path}" did not include readable ingredients.');
+      if (image.errorMessage != null && image.errorMessage!.trim().isNotEmpty) {
+        imageErrors.add(image.errorMessage!);
         continue;
       }
 
