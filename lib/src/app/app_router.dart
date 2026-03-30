@@ -23,11 +23,11 @@ final appRouterProvider = Provider<GoRouter>(
   (ref) => GoRouter(
     initialLocation: AppRoutes.onboarding,
     routes: [
-      GoRoute(path: AppRoutes.onboarding, builder: (_, _) => const OnboardingScreen()),
-      GoRoute(path: AppRoutes.home, builder: (_, _) => const HomeScreen()),
-      GoRoute(path: AppRoutes.capture, builder: (_, _) => const CaptureScreen()),
-      GoRoute(path: AppRoutes.pantry, builder: (_, _) => const PantryScreen()),
-      GoRoute(path: AppRoutes.recipes, builder: (_, _) => const RecipesScreen()),
+      GoRoute(path: AppRoutes.onboarding, builder: (_, __) => const OnboardingScreen()),
+      GoRoute(path: AppRoutes.home, builder: (_, __) => const HomeScreen()),
+      GoRoute(path: AppRoutes.capture, builder: (_, __) => const CaptureScreen()),
+      GoRoute(path: AppRoutes.pantry, builder: (_, __) => const PantryScreen()),
+      GoRoute(path: AppRoutes.recipes, builder: (_, __) => const RecipesScreen()),
       GoRoute(
         path: AppRoutes.recipeDetail,
         builder: (_, state) {
@@ -51,14 +51,14 @@ final appRouterProvider = Provider<GoRouter>(
           return CookModeScreen(seedRecipe: seedRecipe);
         },
       ),
-      GoRoute(path: AppRoutes.shoppingList, builder: (_, _) => const ShoppingListScreen()),
-      GoRoute(path: AppRoutes.mealPlanning, builder: (_, _) => const MealPlanningScreen()),
-      GoRoute(path: AppRoutes.preferences, builder: (_, _) => const PreferencesScreen()),
-      GoRoute(path: AppRoutes.about, builder: (_, _) => const AboutScreen()),
-      GoRoute(path: AppRoutes.privacy, builder: (_, _) => const PrivacyScreen()),
-      GoRoute(path: AppRoutes.terms, builder: (_, _) => const TermsScreen()),
-      GoRoute(path: AppRoutes.favoritesHistory, builder: (_, _) => const FavoritesHistoryScreen()),
-      GoRoute(path: AppRoutes.monetization, builder: (_, _) => const MonetizationScreen()),
+      GoRoute(path: AppRoutes.shoppingList, builder: (_, __) => const ShoppingListScreen()),
+      GoRoute(path: AppRoutes.mealPlanning, builder: (_, __) => const MealPlanningScreen()),
+      GoRoute(path: AppRoutes.preferences, builder: (_, __) => const PreferencesScreen()),
+      GoRoute(path: AppRoutes.about, builder: (_, __) => const AboutScreen()),
+      GoRoute(path: AppRoutes.privacy, builder: (_, __) => const PrivacyScreen()),
+      GoRoute(path: AppRoutes.terms, builder: (_, __) => const TermsScreen()),
+      GoRoute(path: AppRoutes.favoritesHistory, builder: (_, __) => const FavoritesHistoryScreen()),
+      GoRoute(path: AppRoutes.monetization, builder: (_, __) => const MonetizationScreen()),
     ],
   ),
 );

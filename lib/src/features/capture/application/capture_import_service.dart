@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -37,7 +38,7 @@ class CaptureImportService {
       }
 
       return [_toCapturedImage(await _persistImage(picked), category, CaptureInputMethod.camera)];
-    } on ImagePickerException catch (error) {
+    } on PlatformException catch (error) {
       throw _mapPickerException(error.code);
     }
   }
@@ -58,7 +59,7 @@ class CaptureImportService {
         images.add(_toCapturedImage(await _persistImage(file), category, method));
       }
       return images;
-    } on ImagePickerException catch (error) {
+    } on PlatformException catch (error) {
       throw _mapPickerException(error.code);
     }
   }
@@ -87,7 +88,7 @@ class CaptureImportService {
         );
       }
       return recovered;
-    } on ImagePickerException catch (error) {
+    } on PlatformException catch (error) {
       throw _mapPickerException(error.code);
     }
   }

@@ -1,8 +1,8 @@
-import '../../core/models/app_models.dart';
+import '../../core/models/app_models.dart' as core;
 import '../../core/repositories/favorites_repository.dart';
 import '../../core/repositories/pantry_repository.dart';
 import '../../core/repositories/preferences_repository.dart';
-import '../../domain/models/models.dart';
+import '../../domain/models/models.dart' as domain;
 import 'firestore_user_cloud_store.dart';
 
 class SyncedPantryRepository implements PantryRepository {
@@ -28,7 +28,7 @@ class SyncedPantryRepository implements PantryRepository {
   Future<String> exportToJson() => _local.exportToJson();
 
   @override
-  Future<List<PantryItem>> fetchAll() async {
+  Future<List<domain.PantryItem>> fetchAll() async {
     final localItems = await _local.fetchAll();
     _syncToCloud();
     return localItems;
@@ -41,13 +41,13 @@ class SyncedPantryRepository implements PantryRepository {
   }
 
   @override
-  Future<void> saveAll(List<PantryItem> items) async {
+  Future<void> saveAll(List<domain.PantryItem> items) async {
     await _local.saveAll(items);
     await _syncToCloud();
   }
 
   @override
-  Future<void> upsert(PantryItem item) async {
+  Future<void> upsert(domain.PantryItem item) async {
     await _local.upsert(item);
     await _syncToCloud();
   }
@@ -76,14 +76,14 @@ class SyncedPreferencesRepository implements PreferencesRepository {
   final String _uid;
 
   @override
-  Future<UserPreferences> fetch() async {
+  Future<core.UserPreferences> fetch() async {
     final localPrefs = await _local.fetch();
     _cloud.writePreferences(_uid, localPrefs);
     return localPrefs;
   }
 
   @override
-  Future<void> save(UserPreferences preferences) async {
+  Future<void> save(core.UserPreferences preferences) async {
     await _local.save(preferences);
     await _cloud.writePreferences(_uid, preferences);
   }
@@ -107,20 +107,20 @@ class SyncedFavoritesRepository implements FavoritesRepository {
   final String _uid;
 
   @override
-  Future<void> addHistoryEvent(HistoryEvent event) async {
+  Future<void> addHistoryEvent(core.HistoryEvent event) async {
     await _local.addHistoryEvent(event);
     await _syncHistory();
   }
 
   @override
-  Future<List<HistoryEvent>> fetchHistory() async {
+  Future<List<core.HistoryEvent>> fetchHistory() async {
     final history = await _local.fetchHistory();
     _cloud.writeRecipeHistory(_uid, history);
     return history;
   }
 
   @override
-  Future<List<SavedRecipe>> fetchSaved() async {
+  Future<List<core.SavedRecipe>> fetchSaved() async {
     final saved = await _local.fetchSaved();
     _cloud.writeSavedRecipes(_uid, saved);
     return saved;
@@ -133,7 +133,7 @@ class SyncedFavoritesRepository implements FavoritesRepository {
   }
 
   @override
-  Future<void> saveRecipe(RecipeSuggestion recipe) async {
+  Future<void> saveRecipe(core.RecipeSuggestion recipe) async {
     await _local.saveRecipe(recipe);
     await _syncSaved();
   }
@@ -143,11 +143,11 @@ class SyncedFavoritesRepository implements FavoritesRepository {
     if (cloudSaved != null) {
       for (final recipe in cloudSaved.reversed) {
         await _local.saveRecipe(
-          RecipeSuggestion(
+          core.RecipeSuggestion(
             id: recipe.recipeId,
             title: recipe.recipeTitle,
             shortDescription: 'Synced recipe',
-            matchType: RecipeMatchType.pantryFreestyle,
+            matchType: core.RecipeMatchType.pantryFreestyle,
             prepMinutes: 0,
             cookMinutes: 0,
             difficulty: 1,
@@ -161,7 +161,7 @@ class SyncedFavoritesRepository implements FavoritesRepository {
             availableIngredients: const [],
             steps: const [],
             suggestedPairings: const [],
-            explanation: const RecipeExplanation(summary: 'Synced from cloud', pantryHighlights: []),
+            explanation: const core.RecipeExplanation(summary: 'Synced from cloud', pantryHighlights: []),
           ),
         );
       }

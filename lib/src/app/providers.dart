@@ -23,7 +23,7 @@ import '../core/services/analytics_service.dart';
 import '../core/services/crash_reporting_service.dart';
 import '../core/services/local_persistence_service.dart';
 import '../core/services/user_error_messaging_service.dart';
-import '../domain/models/models.dart';
+import '../domain/models/models.dart' hide AdPlacement, SubscriptionState;
 import '../features/capture/application/capture_import_service.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
 import '../features/cook_mode/infrastructure/device/device_cook_mode_services.dart';
@@ -133,7 +133,7 @@ final speechCommandServiceProvider = Provider<SpeechCommandService>((ref) {
 
 final mockSpeechCommandEmitterProvider = Provider<MockSpeechCommandEmitter>((ref) {
   final service = ref.watch(speechCommandServiceProvider);
-  if (service is MockSpeechCommandEmitter) return service;
+  if (service is MockSpeechCommandEmitter) return service as MockSpeechCommandEmitter;
   return ref.watch(_speechCommandBusProvider);
 });
 
@@ -208,7 +208,7 @@ final mealPlanningControllerProvider = StateNotifierProvider<MealPlanningControl
 
 class AccountController extends StateNotifier<AsyncValue<AuthUser?>> {
   AccountController(this._ref) : super(const AsyncData(null)) {
-    _subscription = _ref.listenManual<AsyncValue<AuthUser?>>(
+    _ref.listen<AsyncValue<AuthUser?>>(
       authStateProvider,
       (_, next) => state = next,
       fireImmediately: true,
@@ -216,7 +216,6 @@ class AccountController extends StateNotifier<AsyncValue<AuthUser?>> {
   }
 
   final Ref _ref;
-  late final ProviderSubscription<AsyncValue<AuthUser?>> _subscription;
 
   AuthRepository get _auth => _ref.read(authRepositoryProvider);
 
@@ -254,12 +253,6 @@ class AccountController extends StateNotifier<AsyncValue<AuthUser?>> {
 
   Future<void> signOut() async {
     await _auth.signOut();
-  }
-
-  @override
-  void dispose() {
-    _subscription.close();
-    super.dispose();
   }
 }
 
