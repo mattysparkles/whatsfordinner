@@ -1,4 +1,7 @@
 enum MealType { breakfast, lunch, snack, dinner, dessert }
+enum CookingSkillLevel { beginner, intermediate, advanced }
+enum LeftoverPreference { loveLeftovers, neutral, preferFresh }
+enum HistoryEventType { viewedRecipe, savedRecipe, startedCookMode, completedCookMode, generatedFreestyleIdea }
 
 enum RecipeMatchType {
   exact,
@@ -50,12 +53,98 @@ class UserPreferences {
     this.householdSize = 2,
     this.dietaryFilters = const [],
     this.preferenceFilters = const [],
+    this.allergies = const [],
+    this.aversions = const [],
+    this.cookingSkillLevel = CookingSkillLevel.beginner,
+    this.leftoverPreference = LeftoverPreference.neutral,
+    this.lowSodium = false,
+    this.lowSugar = false,
+    this.lowerCalorie = false,
   });
 
   final List<MealType> preferredMealTypes;
   final int householdSize;
   final List<String> dietaryFilters;
   final List<String> preferenceFilters;
+  final List<String> allergies;
+  final List<String> aversions;
+  final CookingSkillLevel cookingSkillLevel;
+  final LeftoverPreference leftoverPreference;
+  final bool lowSodium;
+  final bool lowSugar;
+  final bool lowerCalorie;
+
+  UserPreferences copyWith({
+    List<MealType>? preferredMealTypes,
+    int? householdSize,
+    List<String>? dietaryFilters,
+    List<String>? preferenceFilters,
+    List<String>? allergies,
+    List<String>? aversions,
+    CookingSkillLevel? cookingSkillLevel,
+    LeftoverPreference? leftoverPreference,
+    bool? lowSodium,
+    bool? lowSugar,
+    bool? lowerCalorie,
+  }) {
+    return UserPreferences(
+      preferredMealTypes: preferredMealTypes ?? this.preferredMealTypes,
+      householdSize: householdSize ?? this.householdSize,
+      dietaryFilters: dietaryFilters ?? this.dietaryFilters,
+      preferenceFilters: preferenceFilters ?? this.preferenceFilters,
+      allergies: allergies ?? this.allergies,
+      aversions: aversions ?? this.aversions,
+      cookingSkillLevel: cookingSkillLevel ?? this.cookingSkillLevel,
+      leftoverPreference: leftoverPreference ?? this.leftoverPreference,
+      lowSodium: lowSodium ?? this.lowSodium,
+      lowSugar: lowSugar ?? this.lowSugar,
+      lowerCalorie: lowerCalorie ?? this.lowerCalorie,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'preferredMealTypes': preferredMealTypes.map((item) => item.name).toList(growable: false),
+        'householdSize': householdSize,
+        'dietaryFilters': dietaryFilters,
+        'preferenceFilters': preferenceFilters,
+        'allergies': allergies,
+        'aversions': aversions,
+        'cookingSkillLevel': cookingSkillLevel.name,
+        'leftoverPreference': leftoverPreference.name,
+        'lowSodium': lowSodium,
+        'lowSugar': lowSugar,
+        'lowerCalorie': lowerCalorie,
+      };
+
+  factory UserPreferences.fromJson(Map<String, dynamic> json) {
+    final preferredMealTypes = (json['preferredMealTypes'] as List<dynamic>? ?? const [])
+        .map(
+          (item) => MealType.values.firstWhere(
+            (value) => value.name == item,
+            orElse: () => MealType.dinner,
+          ),
+        )
+        .toList(growable: false);
+    return UserPreferences(
+      preferredMealTypes: preferredMealTypes.isEmpty ? const [MealType.dinner] : preferredMealTypes,
+      householdSize: json['householdSize'] as int? ?? 2,
+      dietaryFilters: (json['dietaryFilters'] as List<dynamic>? ?? const []).cast<String>(),
+      preferenceFilters: (json['preferenceFilters'] as List<dynamic>? ?? const []).cast<String>(),
+      allergies: (json['allergies'] as List<dynamic>? ?? const []).cast<String>(),
+      aversions: (json['aversions'] as List<dynamic>? ?? const []).cast<String>(),
+      cookingSkillLevel: CookingSkillLevel.values.firstWhere(
+        (value) => value.name == json['cookingSkillLevel'],
+        orElse: () => CookingSkillLevel.beginner,
+      ),
+      leftoverPreference: LeftoverPreference.values.firstWhere(
+        (value) => value.name == json['leftoverPreference'],
+        orElse: () => LeftoverPreference.neutral,
+      ),
+      lowSodium: json['lowSodium'] as bool? ?? false,
+      lowSugar: json['lowSugar'] as bool? ?? false,
+      lowerCalorie: json['lowerCalorie'] as bool? ?? false,
+    );
+  }
 }
 
 class RecipeIngredientRequirement {
@@ -181,10 +270,70 @@ class ParsedIngredient {
 }
 
 class SavedRecipe {
-  const SavedRecipe({required this.recipeId, required this.savedAt});
+  const SavedRecipe({
+    required this.recipeId,
+    required this.savedAt,
+    required this.recipeTitle,
+    this.isPantryFreestyle = false,
+  });
 
   final String recipeId;
   final DateTime savedAt;
+  final String recipeTitle;
+  final bool isPantryFreestyle;
+
+  Map<String, dynamic> toJson() => {
+        'recipeId': recipeId,
+        'savedAt': savedAt.toIso8601String(),
+        'recipeTitle': recipeTitle,
+        'isPantryFreestyle': isPantryFreestyle,
+      };
+
+  factory SavedRecipe.fromJson(Map<String, dynamic> json) {
+    return SavedRecipe(
+      recipeId: json['recipeId'] as String,
+      savedAt: DateTime.parse(json['savedAt'] as String),
+      recipeTitle: json['recipeTitle'] as String? ?? 'Recipe',
+      isPantryFreestyle: json['isPantryFreestyle'] as bool? ?? false,
+    );
+  }
+}
+
+class HistoryEvent {
+  const HistoryEvent({
+    required this.type,
+    required this.occurredAt,
+    required this.recipeId,
+    required this.recipeTitle,
+    this.isPantryFreestyle = false,
+  });
+
+  final HistoryEventType type;
+  final DateTime occurredAt;
+  final String recipeId;
+  final String recipeTitle;
+  final bool isPantryFreestyle;
+
+  Map<String, dynamic> toJson() => {
+        'type': type.name,
+        'occurredAt': occurredAt.toIso8601String(),
+        'recipeId': recipeId,
+        'recipeTitle': recipeTitle,
+        'isPantryFreestyle': isPantryFreestyle,
+      };
+
+  factory HistoryEvent.fromJson(Map<String, dynamic> json) {
+    return HistoryEvent(
+      type: HistoryEventType.values.firstWhere(
+        (value) => value.name == json['type'],
+        orElse: () => HistoryEventType.viewedRecipe,
+      ),
+      occurredAt: DateTime.parse(json['occurredAt'] as String),
+      recipeId: json['recipeId'] as String,
+      recipeTitle: json['recipeTitle'] as String? ?? 'Recipe',
+      isPantryFreestyle: json['isPantryFreestyle'] as bool? ?? false,
+    );
+  }
 }
 
 enum ProviderCapabilityLabel {
