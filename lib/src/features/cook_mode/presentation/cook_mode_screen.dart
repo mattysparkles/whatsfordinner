@@ -201,6 +201,29 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        if (_index >= totalSteps - 1)
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () async {
+                final recipe = widget.seedRecipe ?? ref.read(selectedRecipeProvider);
+                if (recipe != null) {
+                  await ref.read(favoritesHistoryControllerProvider.notifier).trackEvent(
+                        type: HistoryEventType.completedCookMode,
+                        recipe: recipe,
+                      );
+                }
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Nice cooking! Added to your history.')),
+                  );
+                }
+              },
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Mark as cooked'),
+            ),
+          ),
       ],
     );
   }

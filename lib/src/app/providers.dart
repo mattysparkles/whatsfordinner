@@ -12,6 +12,7 @@ import '../core/services/recipe_service.dart';
 import '../core/services/vision_parsing_service.dart';
 import '../core/services/vision_service.dart';
 import '../core/services/pantry_intelligence_service.dart';
+import '../core/services/local_persistence_service.dart';
 import '../domain/models/models.dart';
 import '../features/capture/application/capture_import_service.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
@@ -30,7 +31,10 @@ import '../infrastructure/mock/mock_services.dart';
 import '../infrastructure/recipes/openai/openai_recipe_suggestion_service.dart';
 import '../infrastructure/mock/mock_vision_parsing_service.dart';
 import '../infrastructure/vision/openai/openai_vision_parsing_service.dart';
+import '../infrastructure/persistence/hive_local_persistence.dart';
+import '../infrastructure/persistence/local_favorites_repository.dart';
 import '../infrastructure/persistence/local_pantry_repository.dart';
+import '../infrastructure/persistence/local_preferences_repository.dart';
 import 'app_router.dart';
 
 export 'app_router.dart';
@@ -87,18 +91,184 @@ final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
   if (config.useMocks) return InMemoryPantryRepository();
   return LocalPantryRepository();
 });
+final localPersistenceProvider = Provider<LocalPersistenceService>((ref) => HiveLocalPersistence.instance);
 final preferencesRepositoryProvider = Provider<PreferencesRepository>((ref) {
-  final config = ref.watch(appConfigProvider);
-  if (config.useMocks) return InMemoryPreferencesRepository();
-  throw UnsupportedError('PreferencesRepository is not wired for production yet. Set USE_MOCKS=true.');
+  return LocalPreferencesRepository(ref.watch(localPersistenceProvider));
 });
 final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
-  final config = ref.watch(appConfigProvider);
-  if (config.useMocks) return InMemoryFavoritesRepository();
-  throw UnsupportedError('FavoritesRepository is not wired for production yet. Set USE_MOCKS=true.');
+  return LocalFavoritesRepository(ref.watch(localPersistenceProvider));
 });
 
 final selectedRecipeProvider = StateProvider<core.RecipeSuggestion?>((_) => null);
+
+class PreferencesController extends StateNotifier<AsyncValue<core.UserPreferences>> {
+  PreferencesController(this._repo) : super(const AsyncLoading()) {
+    load();
+  }
+
+  final PreferencesRepository _repo;
+
+  Future<void> load() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(_repo.fetch);
+  }
+
+  Future<void> save(core.UserPreferences next) async {
+    state = const AsyncLoading();
+    await _repo.save(next);
+    state = AsyncData(next);
+  }
+}
+
+final preferencesControllerProvider = StateNotifierProvider<PreferencesController, AsyncValue<core.UserPreferences>>(
+  (ref) => PreferencesController(ref.watch(preferencesRepositoryProvider)),
+);
+
+enum RecipeHistorySort { newest, oldest, title }
+
+class FavoritesHistoryFilters {
+  const FavoritesHistoryFilters({this.searchQuery = '', this.savedOnlyFreestyle = false, this.historyType, this.historySort = RecipeHistorySort.newest});
+
+  final String searchQuery;
+  final bool savedOnlyFreestyle;
+  final core.HistoryEventType? historyType;
+  final RecipeHistorySort historySort;
+
+  FavoritesHistoryFilters copyWith({
+    String? searchQuery,
+    bool? savedOnlyFreestyle,
+    core.HistoryEventType? historyType,
+    RecipeHistorySort? historySort,
+    bool clearHistoryType = false,
+  }) {
+    return FavoritesHistoryFilters(
+      searchQuery: searchQuery ?? this.searchQuery,
+      savedOnlyFreestyle: savedOnlyFreestyle ?? this.savedOnlyFreestyle,
+      historyType: clearHistoryType ? null : (historyType ?? this.historyType),
+      historySort: historySort ?? this.historySort,
+    );
+  }
+}
+
+class FavoritesHistoryState {
+  const FavoritesHistoryState({
+    this.savedRecipes = const [],
+    this.history = const [],
+    this.filters = const FavoritesHistoryFilters(),
+    this.isLoading = false,
+  });
+
+  final List<core.SavedRecipe> savedRecipes;
+  final List<core.HistoryEvent> history;
+  final FavoritesHistoryFilters filters;
+  final bool isLoading;
+
+  List<core.SavedRecipe> get filteredSaved {
+    final query = filters.searchQuery.trim().toLowerCase();
+    var items = savedRecipes.where((item) {
+      final matchesText = query.isEmpty || item.recipeTitle.toLowerCase().contains(query);
+      final matchesFreestyle = !filters.savedOnlyFreestyle || item.isPantryFreestyle;
+      return matchesText && matchesFreestyle;
+    }).toList(growable: false);
+    if (filters.historySort == RecipeHistorySort.oldest) {
+      items = [...items]..sort((a, b) => a.savedAt.compareTo(b.savedAt));
+    } else if (filters.historySort == RecipeHistorySort.title) {
+      items = [...items]..sort((a, b) => a.recipeTitle.compareTo(b.recipeTitle));
+    } else {
+      items = [...items]..sort((a, b) => b.savedAt.compareTo(a.savedAt));
+    }
+    return items;
+  }
+
+  List<core.HistoryEvent> get filteredHistory {
+    final query = filters.searchQuery.trim().toLowerCase();
+    var items = history.where((item) {
+      final matchesText = query.isEmpty || item.recipeTitle.toLowerCase().contains(query);
+      final matchesType = filters.historyType == null || item.type == filters.historyType;
+      return matchesText && matchesType;
+    }).toList(growable: false);
+    if (filters.historySort == RecipeHistorySort.oldest) {
+      items = [...items]..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
+    } else if (filters.historySort == RecipeHistorySort.title) {
+      items = [...items]..sort((a, b) => a.recipeTitle.compareTo(b.recipeTitle));
+    } else {
+      items = [...items]..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+    }
+    return items;
+  }
+
+  FavoritesHistoryState copyWith({
+    List<core.SavedRecipe>? savedRecipes,
+    List<core.HistoryEvent>? history,
+    FavoritesHistoryFilters? filters,
+    bool? isLoading,
+  }) {
+    return FavoritesHistoryState(
+      savedRecipes: savedRecipes ?? this.savedRecipes,
+      history: history ?? this.history,
+      filters: filters ?? this.filters,
+      isLoading: isLoading ?? this.isLoading,
+    );
+  }
+}
+
+class FavoritesHistoryController extends StateNotifier<FavoritesHistoryState> {
+  FavoritesHistoryController(this._repo) : super(const FavoritesHistoryState(isLoading: true)) {
+    load();
+  }
+
+  final FavoritesRepository _repo;
+
+  Future<void> load() async {
+    state = state.copyWith(isLoading: true);
+    final saved = await _repo.fetchSaved();
+    final history = await _repo.fetchHistory();
+    state = state.copyWith(savedRecipes: saved, history: history, isLoading: false);
+  }
+
+  Future<void> toggleSaved(core.RecipeSuggestion recipe) async {
+    final existing = state.savedRecipes.any((item) => item.recipeId == recipe.id);
+    if (existing) {
+      await _repo.removeRecipe(recipe.id);
+    } else {
+      await _repo.saveRecipe(recipe);
+      await trackEvent(type: core.HistoryEventType.savedRecipe, recipe: recipe);
+    }
+    await load();
+  }
+
+  Future<void> trackEvent({required core.HistoryEventType type, required core.RecipeSuggestion recipe}) async {
+    final alreadyTrackedRecently = state.history.any(
+      (entry) =>
+          entry.type == type &&
+          entry.recipeId == recipe.id &&
+          DateTime.now().difference(entry.occurredAt).inMinutes < 30,
+    );
+    if (alreadyTrackedRecently) return;
+    await _repo.addHistoryEvent(
+      core.HistoryEvent(
+        type: type,
+        occurredAt: DateTime.now(),
+        recipeId: recipe.id,
+        recipeTitle: recipe.title,
+        isPantryFreestyle: recipe.isPantryFreestyle,
+      ),
+    );
+    final history = await _repo.fetchHistory();
+    state = state.copyWith(history: history);
+  }
+
+  void setSearch(String query) => state = state.copyWith(filters: state.filters.copyWith(searchQuery: query));
+  void setSavedFreestyleOnly(bool enabled) =>
+      state = state.copyWith(filters: state.filters.copyWith(savedOnlyFreestyle: enabled));
+  void setHistoryType(core.HistoryEventType? type) =>
+      state = state.copyWith(filters: state.filters.copyWith(historyType: type, clearHistoryType: type == null));
+  void setSort(RecipeHistorySort sort) => state = state.copyWith(filters: state.filters.copyWith(historySort: sort));
+}
+
+final favoritesHistoryControllerProvider = StateNotifierProvider<FavoritesHistoryController, FavoritesHistoryState>(
+  (ref) => FavoritesHistoryController(ref.watch(favoritesRepositoryProvider)),
+);
 
 class PantryFilters {
   const PantryFilters({this.category, this.sourceType, this.freshnessState});
@@ -415,10 +585,23 @@ final recipeSuggestionsProvider = FutureProvider<List<core.RecipeSuggestion>>((r
   final preferencesRepo = ref.watch(preferencesRepositoryProvider);
   final stored = await preferencesRepo.fetch();
   final preferences = core.UserPreferences(
-    preferredMealTypes: [discovery.mealType],
+    preferredMealTypes: [discovery.mealType, ...stored.preferredMealTypes].toSet().toList(growable: false),
     householdSize: discovery.servings,
-    dietaryFilters: discovery.dietaryFilters.toList(),
-    preferenceFilters: [...stored.preferenceFilters, ...discovery.preferenceFilters].toSet().toList(),
+    dietaryFilters: [...stored.dietaryFilters, ...discovery.dietaryFilters].toSet().toList(growable: false),
+    preferenceFilters: [
+      ...stored.preferenceFilters,
+      ...discovery.preferenceFilters,
+      if (stored.lowSodium) 'low-sodium',
+      if (stored.lowSugar) 'low-sugar',
+      if (stored.lowerCalorie) 'lower-calorie',
+    ].toSet().toList(growable: false),
+    allergies: stored.allergies,
+    aversions: stored.aversions,
+    cookingSkillLevel: stored.cookingSkillLevel,
+    leftoverPreference: stored.leftoverPreference,
+    lowSodium: stored.lowSodium,
+    lowSugar: stored.lowSugar,
+    lowerCalorie: stored.lowerCalorie,
   );
   final service = ref.watch(recipeServiceProvider);
   final mappedItems = pantryItems
@@ -438,6 +621,10 @@ final recipeSuggestionsProvider = FutureProvider<List<core.RecipeSuggestion>>((r
     preferences: preferences,
     servings: discovery.servings,
   );
+  final historyController = ref.read(favoritesHistoryControllerProvider.notifier);
+  for (final idea in suggestions.where((item) => item.isPantryFreestyle)) {
+    await historyController.trackEvent(type: core.HistoryEventType.generatedFreestyleIdea, recipe: idea);
+  }
   return _sortSuggestions(suggestions, discovery.sortOption);
 });
 

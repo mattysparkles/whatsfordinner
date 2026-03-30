@@ -81,12 +81,26 @@ class InMemoryPreferencesRepository implements PreferencesRepository {
 
 class InMemoryFavoritesRepository implements FavoritesRepository {
   final List<SavedRecipe> _saved = [];
+  final List<HistoryEvent> _history = [];
 
   @override
   Future<List<SavedRecipe>> fetchSaved() async => _saved;
 
   @override
-  Future<void> saveRecipe(String recipeId) async {
-    _saved.add(SavedRecipe(recipeId: recipeId, savedAt: DateTime.now()));
+  Future<void> saveRecipe(RecipeSuggestion recipe) async {
+    _saved.add(SavedRecipe(recipeId: recipe.id, recipeTitle: recipe.title, savedAt: DateTime.now()));
+  }
+
+  @override
+  Future<void> removeRecipe(String recipeId) async {
+    _saved.removeWhere((item) => item.recipeId == recipeId);
+  }
+
+  @override
+  Future<List<HistoryEvent>> fetchHistory() async => _history;
+
+  @override
+  Future<void> addHistoryEvent(HistoryEvent event) async {
+    _history.insert(0, event);
   }
 }

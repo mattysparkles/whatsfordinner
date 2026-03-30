@@ -16,6 +16,8 @@ class RecipeDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
+  bool _trackedOpen = false;
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +36,17 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
         body: Center(child: Text('No recipe selected.')),
       );
     }
+    if (!_trackedOpen) {
+      _trackedOpen = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(favoritesHistoryControllerProvider.notifier).trackEvent(
+              type: HistoryEventType.viewedRecipe,
+              recipe: recipe,
+            );
+      });
+    }
+    final historyState = ref.watch(favoritesHistoryControllerProvider);
+    final isSaved = historyState.savedRecipes.any((item) => item.recipeId == recipe.id);
     return AppScaffold(
       title: recipe.title,
       body: ListView(
@@ -72,13 +85,15 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
             children: [
               FilledButton.icon(
                 onPressed: () async {
-                  await ref.read(favoritesRepositoryProvider).saveRecipe(recipe.id);
+                  await ref.read(favoritesHistoryControllerProvider.notifier).toggleSaved(recipe);
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to favorites.')));
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text(isSaved ? 'Removed from favorites.' : 'Saved to favorites.')));
                   }
                 },
-                icon: const Icon(Icons.favorite_border),
-                label: const Text('Save favorite'),
+                icon: Icon(isSaved ? Icons.favorite : Icons.favorite_border),
+                label: Text(isSaved ? 'Saved' : 'Save favorite'),
               ),
               OutlinedButton.icon(
                 onPressed: () {
@@ -90,7 +105,15 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                 label: const Text('Add missing to shopping list'),
               ),
               FilledButton.icon(
-                onPressed: () => context.pushCookMode(recipe),
+                onPressed: () async {
+                  await ref.read(favoritesHistoryControllerProvider.notifier).trackEvent(
+                        type: HistoryEventType.startedCookMode,
+                        recipe: recipe,
+                      );
+                  if (context.mounted) {
+                    context.pushCookMode(recipe);
+                  }
+                },
                 icon: const Icon(Icons.play_arrow),
                 label: const Text('Start cook mode'),
               ),
