@@ -254,6 +254,8 @@ class ParsedIngredient {
     required this.sourceImageId,
     this.category = IngredientCategory.other,
     this.whyDetected = 'Why we think this is here: placeholder explanation pending real AI integration.',
+    this.inferredQuantity,
+    this.inferredUnit,
     this.approved = true,
   });
 
@@ -265,6 +267,8 @@ class ParsedIngredient {
   final String sourceImageId;
   final IngredientCategory category;
   final String whyDetected;
+  final double? inferredQuantity;
+  final String? inferredUnit;
   final bool approved;
 
   ParsedIngredient copyWith({
@@ -276,6 +280,8 @@ class ParsedIngredient {
     String? sourceImageId,
     IngredientCategory? category,
     String? whyDetected,
+    double? inferredQuantity,
+    String? inferredUnit,
     bool? approved,
   }) {
     return ParsedIngredient(
@@ -287,6 +293,8 @@ class ParsedIngredient {
       sourceImageId: sourceImageId ?? this.sourceImageId,
       category: category ?? this.category,
       whyDetected: whyDetected ?? this.whyDetected,
+      inferredQuantity: inferredQuantity ?? this.inferredQuantity,
+      inferredUnit: inferredUnit ?? this.inferredUnit,
       approved: approved ?? this.approved,
     );
   }

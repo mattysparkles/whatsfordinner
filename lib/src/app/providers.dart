@@ -27,6 +27,7 @@ import '../features/shopping_list/infrastructure/mock/mock_shopping_link_service
 import '../infrastructure/mock/mock_repositories.dart';
 import '../infrastructure/mock/mock_services.dart';
 import '../infrastructure/mock/mock_vision_parsing_service.dart';
+import '../infrastructure/vision/openai/openai_vision_parsing_service.dart';
 import '../infrastructure/persistence/local_pantry_repository.dart';
 import 'app_router.dart';
 
@@ -44,7 +45,7 @@ final captureImportServiceProvider = Provider<CaptureImportService>((ref) => Cap
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockVisionParsingService();
-  throw UnsupportedError('VisionParsingService is not wired for production yet. Set USE_MOCKS=true.');
+  return OpenAiVisionParsingService(config: config);
 });
 
 final recipeServiceProvider = Provider<RecipeSuggestionService>((ref) {
