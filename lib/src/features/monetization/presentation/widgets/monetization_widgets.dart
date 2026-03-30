@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../../../app/providers.dart';
 import '../../../../core/config/app_config.dart';
@@ -29,111 +28,13 @@ class AdPlacementSlot extends ConsumerWidget {
       };
     }
 
+    // Live ad rendering is temporarily disabled to keep app startup resilient
+    // while Android AdMob manifest configuration is being finalized.
     return switch (placement.type) {
-      AdPlacementType.banner => _LiveBannerAd(unitId: config.googleAdsBannerUnitId, placement: placement),
-      AdPlacementType.native => _LiveNativeAd(
-          unitId: config.googleAdsNativeUnitId,
-          factoryId: config.googleAdsNativeFactoryId,
-          placement: placement,
-        ),
+      AdPlacementType.banner => const MockBannerAdWidget(),
+      AdPlacementType.native => const MockNativeAdWidget(),
       AdPlacementType.rewardedPrompt => const SizedBox.shrink(),
     };
-  }
-}
-
-class _LiveBannerAd extends StatefulWidget {
-  const _LiveBannerAd({required this.unitId, required this.placement});
-
-  final String unitId;
-  final AdPlacement placement;
-
-  @override
-  State<_LiveBannerAd> createState() => _LiveBannerAdState();
-}
-
-class _LiveBannerAdState extends State<_LiveBannerAd> {
-  BannerAd? _ad;
-
-  @override
-  void initState() {
-    super.initState();
-    _ad = BannerAd(
-      adUnitId: widget.unitId,
-      size: AdSize.banner,
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdImpression: (ad) {
-          if (!mounted) return;
-          final container = ProviderScope.containerOf(context, listen: false);
-          container.read(analyticsServiceProvider).logEvent(
-                AppAnalyticsEvent.adImpression,
-                parameters: {'placement': widget.placement.id, 'type': 'banner'},
-              );
-        },
-      ),
-    )..load();
-  }
-
-  @override
-  void dispose() {
-    _ad?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ad = _ad;
-    if (ad == null) return const SizedBox.shrink();
-    return SizedBox(height: ad.size.height.toDouble(), width: ad.size.width.toDouble(), child: AdWidget(ad: ad));
-  }
-}
-
-class _LiveNativeAd extends StatefulWidget {
-  const _LiveNativeAd({required this.unitId, required this.factoryId, required this.placement});
-
-  final String unitId;
-  final String factoryId;
-  final AdPlacement placement;
-
-  @override
-  State<_LiveNativeAd> createState() => _LiveNativeAdState();
-}
-
-class _LiveNativeAdState extends State<_LiveNativeAd> {
-  NativeAd? _ad;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.factoryId.isEmpty) return;
-    _ad = NativeAd(
-      adUnitId: widget.unitId,
-      factoryId: widget.factoryId,
-      request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdImpression: (ad) {
-          if (!mounted) return;
-          final container = ProviderScope.containerOf(context, listen: false);
-          container.read(analyticsServiceProvider).logEvent(
-                AppAnalyticsEvent.adImpression,
-                parameters: {'placement': widget.placement.id, 'type': 'native'},
-              );
-        },
-      ),
-    )..load();
-  }
-
-  @override
-  void dispose() {
-    _ad?.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ad = _ad;
-    if (ad == null) return const MockNativeAdWidget();
-    return SizedBox(height: 100, child: AdWidget(ad: ad));
   }
 }
 

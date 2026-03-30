@@ -1,13 +1,9 @@
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-
 import '../../domain/ad_placement.dart';
 import '../../domain/subscription_state.dart';
 import '../../services/ad_service.dart';
 
 class GoogleMobileAdsService implements AdService {
-  GoogleMobileAdsService() {
-    MobileAds.instance.initialize();
-  }
+  GoogleMobileAdsService();
 
   @override
   bool canRenderPlacement({required AdPlacement placement, required SubscriptionState subscription}) {
