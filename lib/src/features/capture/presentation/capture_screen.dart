@@ -1,12 +1,15 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
+import 'package:path/path.dart' as p;
 
 import '../../../app/app_routes.dart';
 import '../../../app/providers.dart';
-import '../../../domain/models/models.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../domain/models/models.dart';
+import '../application/capture_import_service.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({super.key});
@@ -16,10 +19,17 @@ class CaptureScreen extends ConsumerStatefulWidget {
 }
 
 class _CaptureScreenState extends ConsumerState<CaptureScreen> {
-  final _uuid = const Uuid();
   final List<CapturedImage> _images = [];
   CaptureCategory _selectedSource = CaptureCategory.pantry;
   bool _isParsing = false;
+  bool _isImporting = false;
+  String? _importErrorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _recoverLostImports());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,22 +59,38 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             runSpacing: 8,
             children: [
               FilledButton.icon(
-                onPressed: () => _addMockImage(CaptureInputMethod.camera),
+                onPressed: _isImporting ? null : () => _captureFromCamera(),
                 icon: const Icon(Icons.photo_camera),
-                label: const Text('Camera capture'),
+                label: Text(_isImporting ? 'Opening camera...' : 'Camera capture'),
               ),
               OutlinedButton.icon(
-                onPressed: () => _addMockImage(CaptureInputMethod.photoLibrary),
+                onPressed: _isImporting ? null : () => _importFromPhotoLibrary(),
                 icon: const Icon(Icons.photo_library),
                 label: const Text('Photo library'),
               ),
               OutlinedButton.icon(
-                onPressed: () => _addMockImage(CaptureInputMethod.screenshotUpload),
+                onPressed: _isImporting ? null : () => _importScreenshot(),
                 icon: const Icon(Icons.upload_file),
                 label: const Text('Screenshot upload'),
               ),
             ],
           ),
+          if (_importErrorMessage != null) ...[
+            const SizedBox(height: 12),
+            Card(
+              color: Theme.of(context).colorScheme.errorContainer,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onErrorContainer),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_importErrorMessage!)),
+                  ],
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Card(
             child: Padding(
@@ -80,8 +106,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     ..._images.map(
                       (image) => ListTile(
                         dense: true,
-                        leading: const Icon(Icons.image_outlined),
-                        title: Text(image.path),
+                        leading: _CaptureThumbnail(path: image.path),
+                        title: Text(p.basename(image.path)),
                         subtitle: Text('${_sourceLabel(image.category)} • ${_methodLabel(image.inputMethod)}'),
                         trailing: IconButton(
                           icon: const Icon(Icons.close),
@@ -107,19 +133,64 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     );
   }
 
-  void _addMockImage(CaptureInputMethod method) {
-    final fileName = '${_selectedSource.name}_${method.name}_${_images.length + 1}.jpg';
-    setState(
-      () => _images.add(
-        CapturedImage(
-          id: _uuid.v4(),
-          path: fileName,
-          category: _selectedSource,
-          inputMethod: method,
-          createdAt: DateTime.now(),
-        ),
-      ),
-    );
+  Future<void> _captureFromCamera() async {
+    await _runImport(() async {
+      final imported = await ref.read(captureImportServiceProvider).captureFromCamera(category: _selectedSource);
+      setState(() => _images.addAll(imported));
+    });
+  }
+
+  Future<void> _importFromPhotoLibrary() async {
+    await _runImport(() async {
+      final imported = await ref.read(captureImportServiceProvider).importFromLibrary(
+            category: _selectedSource,
+            screenshotMode: false,
+          );
+      setState(() => _images.addAll(imported));
+    });
+  }
+
+  Future<void> _importScreenshot() async {
+    await _runImport(() async {
+      final imported = await ref.read(captureImportServiceProvider).importFromLibrary(
+            category: CaptureCategory.groceryScreenshot,
+            screenshotMode: true,
+          );
+      setState(() => _images.addAll(imported));
+    });
+  }
+
+  Future<void> _recoverLostImports() async {
+    try {
+      final recovered = await ref.read(captureImportServiceProvider).recoverLostImports();
+      if (!mounted || recovered.isEmpty) return;
+      setState(() => _images.addAll(recovered));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Recovered ${recovered.length} image(s) from an interrupted import session.')),
+      );
+    } on CaptureImportException catch (error) {
+      if (!mounted) return;
+      setState(() => _importErrorMessage = error.message);
+    }
+  }
+
+  Future<void> _runImport(Future<void> Function() action) async {
+    setState(() {
+      _isImporting = true;
+      _importErrorMessage = null;
+    });
+
+    try {
+      await action();
+    } on CaptureImportException catch (error) {
+      setState(() => _importErrorMessage = error.message);
+    } catch (_) {
+      setState(() => _importErrorMessage = 'Something went wrong while importing. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _isImporting = false);
+      }
+    }
   }
 
   Future<void> _parseAndReview() async {
@@ -144,6 +215,27 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             }
           },
         ),
+      ),
+    );
+  }
+}
+
+class _CaptureThumbnail extends StatelessWidget {
+  const _CaptureThumbnail({required this.path});
+
+  final String path;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(path);
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(6),
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: file.existsSync()
+            ? Image.file(file, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))
+            : const Icon(Icons.broken_image_outlined),
       ),
     );
   }

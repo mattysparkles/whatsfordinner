@@ -12,6 +12,7 @@ import '../core/services/recipe_service.dart';
 import '../core/services/vision_parsing_service.dart';
 import '../core/services/vision_service.dart';
 import '../domain/models/models.dart';
+import '../features/capture/application/capture_import_service.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
 import '../features/cook_mode/infrastructure/mock/mock_cook_mode_services.dart';
 import '../features/monetization/domain/ad_placement.dart';
@@ -36,6 +37,9 @@ final visionServiceProvider = Provider<VisionService>((ref) {
   if (config.useMocks) return MockVisionService();
   throw UnsupportedError('VisionService is not wired for production yet. Set USE_MOCKS=true.');
 });
+
+
+final captureImportServiceProvider = Provider<CaptureImportService>((ref) => CaptureImportService());
 
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);

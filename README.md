@@ -58,6 +58,23 @@ Key defines:
 
 ---
 
+
+## Camera + photo permissions
+
+Capture flows now use the device camera and photo library via `image_picker`, and imported files are copied into app-local support storage for durable parsing sessions.
+
+When generating platform folders (`flutter create .` if needed), ensure these permissions are present:
+
+- **iOS (`ios/Runner/Info.plist`)**
+  - `NSCameraUsageDescription`
+  - `NSPhotoLibraryUsageDescription`
+- **Android (`android/app/src/main/AndroidManifest.xml`)**
+  - Camera permission + media/gallery read access appropriate for your target SDK
+
+Android startup now attempts `ImagePicker.retrieveLostData()` to recover interrupted imports after process death.
+
+---
+
 ## Architecture at a glance
 
 See `architecture.md` for the full overview.
