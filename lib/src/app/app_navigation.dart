@@ -28,4 +28,8 @@ extension AppNavigation on BuildContext {
   Future<T?> pushShoppingList<T>() {
     return push<T>(AppRoutes.shoppingList);
   }
+
+  Future<T?> pushMealPlanning<T>() {
+    return push<T>(AppRoutes.mealPlanning);
+  }
 }

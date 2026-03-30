@@ -123,6 +123,7 @@ class HomeScreen extends ConsumerWidget {
           _NavigationTile(label: 'Scan ingredients', route: AppRoutes.capture),
           _NavigationTile(label: 'Review pantry', route: AppRoutes.pantry),
           _NavigationTile(label: 'Shopping list', route: AppRoutes.shoppingList),
+          _NavigationTile(label: 'Meal planning', route: AppRoutes.mealPlanning),
           _NavigationTile(label: 'Favorites & history', route: AppRoutes.favoritesHistory),
           _NavigationTile(label: 'Premium & monetization', route: AppRoutes.monetization),
           const LockedFeatureTile(

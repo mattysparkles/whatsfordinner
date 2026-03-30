@@ -87,6 +87,7 @@ class GatewayRecipeSuggestionService implements RecipeSuggestionService {
             ?.whereType<Map<String, dynamic>>()
             .map(
               (pairing) => PairingSuggestion(
+                category: _parsePairingCategory(pairing['category'] as String?),
                 title: (pairing['title'] as String?)?.trim() ?? 'Pairing idea',
                 description: (pairing['description'] as String?)?.trim() ?? 'Complements this recipe.',
               ),
@@ -116,6 +117,17 @@ class GatewayRecipeSuggestionService implements RecipeSuggestionService {
         summary: (item['explanation'] as String?)?.trim() ?? 'Suggested from pantry analysis.',
         pantryHighlights: (item['highlights'] as List?)?.whereType<String>().toList(growable: false) ?? const [],
       ),
+      heroImageUrl: (item['heroImageUrl'] as String?)?.trim(),
+      leftoverGuidance: LeftoverGuidance(
+        storageMethod: (item['leftovers'] as Map<String, dynamic>?)?['storageMethod'] as String? ??
+            'Cool completely, then store in an airtight container.',
+        fridgeDuration: (item['leftovers'] as Map<String, dynamic>?)?['fridgeDuration'] as String? ?? 'Up to 3 days',
+        freezerDuration: (item['leftovers'] as Map<String, dynamic>?)?['freezerDuration'] as String? ?? 'Up to 2 months',
+        reheatingSuggestions: ((item['leftovers'] as Map<String, dynamic>?)?['reheatingSuggestions'] as List?)
+                ?.whereType<String>()
+                .toList(growable: false) ??
+            const ['Reheat gently on the stovetop or in the microwave.'],
+      ),
       isPantryFreestyle: (item['isAiFreestyle'] as bool?) ?? matchType == RecipeMatchType.pantryFreestyle,
     );
   }
@@ -127,6 +139,17 @@ class GatewayRecipeSuggestionService implements RecipeSuggestionService {
       'nearmatch' => RecipeMatchType.nearMatch,
       'pantryfreestyle' => RecipeMatchType.pantryFreestyle,
       _ => RecipeMatchType.nearMatch,
+    };
+  }
+
+  PairingCategory _parsePairingCategory(String? raw) {
+    return switch (raw?.trim().toLowerCase()) {
+      'wine' => PairingCategory.wine,
+      'cocktail' => PairingCategory.cocktail,
+      'beer' => PairingCategory.beer,
+      'softdrink' || 'soft_drink' || 'soft drink' => PairingCategory.softDrink,
+      'appetizer' || 'appetizerorside' || 'appetizer_or_side' || 'appetizer / side pairing' => PairingCategory.appetizerOrSide,
+      _ => PairingCategory.softDrink,
     };
   }
 }

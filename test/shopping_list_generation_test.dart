@@ -62,4 +62,63 @@ void main() {
     expect(updated.quantity, 2);
     expect(updated.note, 'yellow preferred');
   });
+
+  test('meal-plan shopping aggregation merges duplicates across recipes', () {
+    final controller = ShoppingListController(providers: const []);
+    const base = RecipeExplanation(summary: 'mock', pantryHighlights: []);
+
+    const recipeA = RecipeSuggestion(
+      id: 'a',
+      title: 'A',
+      shortDescription: 'a',
+      matchType: RecipeMatchType.nearMatch,
+      prepMinutes: 10,
+      cookMinutes: 10,
+      difficulty: 2,
+      familyFriendlyScore: 3,
+      healthScore: 3,
+      fancyScore: 2,
+      servings: 2,
+      dietaryTags: [],
+      requirements: [],
+      missingIngredients: [
+        MissingIngredient(ingredientName: 'Onion', shortageAmount: 1, unit: 'count'),
+        MissingIngredient(ingredientName: 'Milk', shortageAmount: 1, unit: 'cup'),
+      ],
+      availableIngredients: [],
+      steps: [],
+      suggestedPairings: [],
+      explanation: base,
+    );
+    const recipeB = RecipeSuggestion(
+      id: 'b',
+      title: 'B',
+      shortDescription: 'b',
+      matchType: RecipeMatchType.nearMatch,
+      prepMinutes: 10,
+      cookMinutes: 10,
+      difficulty: 2,
+      familyFriendlyScore: 3,
+      healthScore: 3,
+      fancyScore: 2,
+      servings: 2,
+      dietaryTags: [],
+      requirements: [],
+      missingIngredients: [
+        MissingIngredient(ingredientName: 'Onion', shortageAmount: 2, unit: 'count'),
+      ],
+      availableIngredients: [],
+      steps: [],
+      suggestedPairings: [],
+      explanation: base,
+    );
+
+    controller.createFromMealPlan(title: 'Weekly list', recipes: const [recipeA, recipeB]);
+
+    final list = controller.state.list;
+    expect(list, isNotNull);
+    expect(list!.items.length, 2);
+    final onion = list.items.firstWhere((item) => item.ingredientName == 'Onion');
+    expect(onion.quantity, 3);
+  });
 }

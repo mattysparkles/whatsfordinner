@@ -31,6 +31,8 @@ class _RecipeTemplate {
     required this.mealType,
     required this.steps,
     required this.pairings,
+    required this.heroImageUrl,
+    required this.leftoverGuidance,
   });
 
   final String id;
@@ -47,6 +49,8 @@ class _RecipeTemplate {
   final MealType mealType;
   final List<CookingStep> steps;
   final List<PairingSuggestion> pairings;
+  final String heroImageUrl;
+  final LeftoverGuidance leftoverGuidance;
 }
 
 class MockRecipeSuggestionService implements RecipeSuggestionService {
@@ -74,8 +78,24 @@ class MockRecipeSuggestionService implements RecipeSuggestionService {
         CookingStep(order: 3, instruction: 'Toss pasta in sauce and serve.', estimatedMinutes: 2),
       ],
       pairings: [
-        PairingSuggestion(title: 'Simple side salad', description: 'Lemony greens to brighten the dish.'),
+        PairingSuggestion(
+          category: PairingCategory.appetizerOrSide,
+          title: 'Simple side salad',
+          description: 'Lemony greens to brighten the dish.',
+        ),
+        PairingSuggestion(
+          category: PairingCategory.wine,
+          title: 'Pinot Grigio',
+          description: 'Crisp acidity balances tomato richness.',
+        ),
       ],
+      heroImageUrl: 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?auto=format&fit=crop&w=1200&q=80',
+      leftoverGuidance: LeftoverGuidance(
+        storageMethod: 'Store sauce and pasta together in a sealed container.',
+        fridgeDuration: 'Up to 4 days',
+        freezerDuration: 'Up to 1 month',
+        reheatingSuggestions: ['Microwave with a splash of water', 'Reheat in skillet over medium-low heat'],
+      ),
     ),
     _RecipeTemplate(
       id: 'recipe-frittata',
@@ -100,8 +120,24 @@ class MockRecipeSuggestionService implements RecipeSuggestionService {
         CookingStep(order: 3, instruction: 'Add eggs and bake or cover until set.', estimatedMinutes: 15),
       ],
       pairings: [
-        PairingSuggestion(title: 'Toast soldiers', description: 'Crunchy side for a balanced plate.'),
+        PairingSuggestion(
+          category: PairingCategory.appetizerOrSide,
+          title: 'Toast soldiers',
+          description: 'Crunchy side for a balanced plate.',
+        ),
+        PairingSuggestion(
+          category: PairingCategory.softDrink,
+          title: 'Sparkling lemonade',
+          description: 'Bright citrus keeps the plate feeling light.',
+        ),
       ],
+      heroImageUrl: 'https://images.unsplash.com/photo-1512058564366-c9e3f7a5a6a2?auto=format&fit=crop&w=1200&q=80',
+      leftoverGuidance: LeftoverGuidance(
+        storageMethod: 'Slice and chill in airtight container once fully cooled.',
+        fridgeDuration: 'Up to 3 days',
+        freezerDuration: 'Up to 1 month',
+        reheatingSuggestions: ['Warm in 325°F oven for 8-10 minutes', 'Microwave individual slices for 45-60 seconds'],
+      ),
     ),
   ];
 
@@ -170,6 +206,8 @@ class MockRecipeSuggestionService implements RecipeSuggestionService {
             pantryHighlights: pantryNames.take(3).toList(),
             nutritionAngle: template.healthScore >= 4 ? 'Prioritizes greens and lean ingredients.' : null,
           ),
+          heroImageUrl: template.heroImageUrl,
+          leftoverGuidance: template.leftoverGuidance,
           isPantryFreestyle: false,
         ),
       );
@@ -200,11 +238,22 @@ class MockRecipeSuggestionService implements RecipeSuggestionService {
         CookingStep(order: 3, instruction: 'Finish with acidity and crunch.', estimatedMinutes: 2),
       ],
       suggestedPairings: const [
-        PairingSuggestion(title: 'Sparkling water + citrus', description: 'Fresh, neutral pairing.'),
+        PairingSuggestion(
+          category: PairingCategory.softDrink,
+          title: 'Sparkling water + citrus',
+          description: 'Fresh, neutral pairing.',
+        ),
       ],
       explanation: RecipeExplanation(
-        summary: 'Clearly labeled Pantry Freestyle idea generated from pantry patterns.',
+        summary: 'Pantry Freestyle (creative AI output): generated from pantry patterns, use your judgment.',
         pantryHighlights: pantryNames.take(3).toList(),
+      ),
+      heroImageUrl: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80',
+      leftoverGuidance: const LeftoverGuidance(
+        storageMethod: 'Cool, then refrigerate in shallow airtight containers.',
+        fridgeDuration: 'Up to 4 days',
+        freezerDuration: 'Up to 2 months',
+        reheatingSuggestions: ['Microwave with a splash of water', 'Warm in skillet over medium heat'],
       ),
       isPantryFreestyle: true,
     );
@@ -213,9 +262,9 @@ class MockRecipeSuggestionService implements RecipeSuggestionService {
   }
 
   static String _summaryFor(RecipeMatchType type, int missingCount) => switch (type) {
-        RecipeMatchType.exact => 'Best Match: you can cook this now with current inventory.',
-        RecipeMatchType.nearMatch => 'Almost There: only $missingCount ingredient(s) missing.',
-        RecipeMatchType.pantryFreestyle => 'Pantry Freestyle: AI-inspired concept, not a canonical recipe.',
+        RecipeMatchType.exact => 'Exact match: you can cook this now using your pantry inventory.',
+        RecipeMatchType.nearMatch => 'Almost there: only $missingCount ingredient(s) needed from the store.',
+        RecipeMatchType.pantryFreestyle => 'Pantry Freestyle (creative AI output): flexible concept, not canonical.',
       };
 
   static List<String> _substitutionsFor(String ingredient) => switch (ingredient) {

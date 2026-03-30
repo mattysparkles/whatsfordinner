@@ -7,6 +7,7 @@ abstract final class AppRoutes {
   static const recipeDetail = '/recipes/detail';
   static const cookMode = '/cook-mode';
   static const shoppingList = '/shopping-list';
+  static const mealPlanning = '/meal-planning';
   static const preferences = '/preferences';
   static const about = '/about';
   static const privacy = '/privacy';

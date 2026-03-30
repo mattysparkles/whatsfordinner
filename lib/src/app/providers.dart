@@ -38,6 +38,7 @@ import '../features/monetization/infrastructure/ads/google_mobile_ads_service.da
 import '../features/monetization/services/ad_service.dart';
 import '../features/monetization/services/subscription_service.dart';
 import '../features/monetization/services/monetization_remote_config_service.dart';
+import '../features/meal_planning/domain/meal_planning_controller.dart';
 import '../features/shopping_list/domain/shopping_list_controller.dart';
 import '../features/shopping_list/domain/shopping_services.dart';
 import '../features/shopping_list/infrastructure/adapters/amazon_link_adapter.dart';
@@ -201,6 +202,9 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
 
 final selectedRecipeProvider = StateProvider<core.RecipeSuggestion?>((_) => null);
 final isDebugModeProvider = Provider<bool>((_) => kDebugMode);
+final mealPlanningControllerProvider = StateNotifierProvider<MealPlanningController, MealPlanningState>(
+  (ref) => MealPlanningController(ref.watch(localPersistenceProvider)),
+);
 
 class AccountController extends StateNotifier<AsyncValue<AuthUser?>> {
   AccountController(this._ref) : super(const AsyncData(null)) {

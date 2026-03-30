@@ -33,6 +33,8 @@ enum RecipeSortOption {
       };
 }
 
+enum PairingCategory { wine, cocktail, beer, softDrink, appetizerOrSide }
+
 class PantryItem {
   const PantryItem({
     required this.id,
@@ -209,12 +211,28 @@ class CookingStep {
 
 class PairingSuggestion {
   const PairingSuggestion({
+    this.category = PairingCategory.softDrink,
     required this.title,
     required this.description,
   });
 
+  final PairingCategory category;
   final String title;
   final String description;
+}
+
+class LeftoverGuidance {
+  const LeftoverGuidance({
+    this.storageMethod = 'Cool completely, then store in an airtight container.',
+    this.fridgeDuration = 'Up to 3 days',
+    this.freezerDuration = 'Up to 2 months',
+    this.reheatingSuggestions = const ['Reheat gently on the stovetop or in the microwave.'],
+  });
+
+  final String storageMethod;
+  final String fridgeDuration;
+  final String freezerDuration;
+  final List<String> reheatingSuggestions;
 }
 
 class RecipeExplanation {
@@ -249,6 +267,8 @@ class RecipeSuggestion {
     required this.steps,
     required this.suggestedPairings,
     required this.explanation,
+    this.heroImageUrl,
+    this.leftoverGuidance = const LeftoverGuidance(),
     this.isPantryFreestyle = false,
   });
 
@@ -270,9 +290,74 @@ class RecipeSuggestion {
   final List<CookingStep> steps;
   final List<PairingSuggestion> suggestedPairings;
   final RecipeExplanation explanation;
+  final String? heroImageUrl;
+  final LeftoverGuidance leftoverGuidance;
   final bool isPantryFreestyle;
 
   int get totalMinutes => prepMinutes + cookMinutes;
+}
+
+class MealPlanItem {
+  const MealPlanItem({
+    required this.id,
+    required this.date,
+    required this.recipeId,
+    required this.recipeTitle,
+    this.sourceLabel = 'suggestion',
+  });
+
+  final String id;
+  final DateTime date;
+  final String recipeId;
+  final String recipeTitle;
+  final String sourceLabel;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'date': date.toIso8601String(),
+        'recipeId': recipeId,
+        'recipeTitle': recipeTitle,
+        'sourceLabel': sourceLabel,
+      };
+
+  factory MealPlanItem.fromJson(Map<String, dynamic> json) => MealPlanItem(
+        id: json['id'] as String,
+        date: DateTime.parse(json['date'] as String),
+        recipeId: json['recipeId'] as String,
+        recipeTitle: json['recipeTitle'] as String? ?? 'Recipe',
+        sourceLabel: json['sourceLabel'] as String? ?? 'suggestion',
+      );
+}
+
+class PlannedWeek {
+  const PlannedWeek({
+    required this.id,
+    required this.createdAt,
+    required this.items,
+    this.label = 'Meal plan',
+  });
+
+  final String id;
+  final DateTime createdAt;
+  final List<MealPlanItem> items;
+  final String label;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'createdAt': createdAt.toIso8601String(),
+        'label': label,
+        'items': items.map((item) => item.toJson()).toList(growable: false),
+      };
+
+  factory PlannedWeek.fromJson(Map<String, dynamic> json) => PlannedWeek(
+        id: json['id'] as String,
+        createdAt: DateTime.parse(json['createdAt'] as String),
+        label: json['label'] as String? ?? 'Meal plan',
+        items: (json['items'] as List<dynamic>? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(MealPlanItem.fromJson)
+            .toList(growable: false),
+      );
 }
 
 class ParsedIngredient {
