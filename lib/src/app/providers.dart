@@ -16,6 +16,7 @@ import '../core/services/local_persistence_service.dart';
 import '../domain/models/models.dart';
 import '../features/capture/application/capture_import_service.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
+import '../features/cook_mode/infrastructure/device/device_cook_mode_services.dart';
 import '../features/cook_mode/infrastructure/mock/mock_cook_mode_services.dart';
 import '../features/monetization/domain/ad_placement.dart';
 import '../features/monetization/domain/entitlements.dart';
@@ -74,19 +75,27 @@ final _speechCommandBusProvider = Provider<InMemorySpeechCommandBus>((ref) {
 final textToSpeechServiceProvider = Provider<TextToSpeechService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockTextToSpeechService();
-  throw UnsupportedError('TextToSpeechService is mock-only right now. Set USE_MOCKS=true.');
+  return DeviceTextToSpeechService();
 });
 
-final speechCommandServiceProvider = Provider<SpeechCommandService>((ref) => ref.watch(_speechCommandBusProvider));
+final speechCommandServiceProvider = Provider<SpeechCommandService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return ref.watch(_speechCommandBusProvider);
+  final service = DeviceSpeechCommandService();
+  ref.onDispose(service.dispose);
+  return service;
+});
 
-final mockSpeechCommandEmitterProvider = Provider<MockSpeechCommandEmitter>((
-  ref,
-) => ref.watch(_speechCommandBusProvider));
+final mockSpeechCommandEmitterProvider = Provider<MockSpeechCommandEmitter>((ref) {
+  final service = ref.watch(speechCommandServiceProvider);
+  if (service is MockSpeechCommandEmitter) return service;
+  return ref.watch(_speechCommandBusProvider);
+});
 
 final keepScreenAwakeServiceProvider = Provider<KeepScreenAwakeService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockKeepScreenAwakeService();
-  throw UnsupportedError('KeepScreenAwakeService is mock-only right now. Set USE_MOCKS=true.');
+  return DeviceKeepScreenAwakeService();
 });
 
 final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
