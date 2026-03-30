@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pantry_pilot/src/app/providers.dart';
 import 'package:pantry_pilot/src/core/repositories/pantry_repository.dart';
+import 'package:pantry_pilot/src/core/services/pantry_intelligence_service.dart';
 import 'package:pantry_pilot/src/domain/models/models.dart';
 
 class _MemoryPantryRepository implements PantryRepository {
@@ -40,7 +41,7 @@ class _MemoryPantryRepository implements PantryRepository {
 
 void main() {
   test('pantry flow supports add, filter, edit, delete', () async {
-    final controller = PantryController(_MemoryPantryRepository(const []));
+    final controller = PantryController(_MemoryPantryRepository(const []), const PantryIntelligenceService());
 
     await controller.addOrUpdateItem(
       ingredientName: 'Milk',
@@ -57,9 +58,9 @@ void main() {
     expect(controller.state.filteredItems.single.ingredient.name, 'Milk');
 
     controller.setSourceFilter(PantrySourceType.aiImport);
-    expect(controller.state.filteredItems.single.ingredient.name, 'Tomatoes');
+    expect(controller.state.filteredItems.single.ingredient.name, 'Tomato');
 
-    final toEdit = controller.state.items.firstWhere((item) => item.ingredient.name == 'Tomatoes');
+    final toEdit = controller.state.items.firstWhere((item) => item.ingredient.name == 'Tomato');
     await controller.addOrUpdateItem(
       id: toEdit.id,
       ingredientName: 'Diced Tomatoes',
