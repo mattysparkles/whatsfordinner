@@ -6,6 +6,7 @@ import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/branded_ui.dart';
 
 class RecipeDetailScreen extends ConsumerStatefulWidget {
   const RecipeDetailScreen({super.key, this.seedRecipe});
@@ -35,7 +36,16 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     if (recipe == null) {
       return const AppScaffold(
         title: 'Recipe detail',
-        body: Center(child: Text('No recipe selected.')),
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: BrandedIllustrationSlot(
+              title: 'Pick a recipe to begin',
+              subtitle: 'Your selected recipe details will appear here.',
+              icon: Icons.menu_book_outlined,
+            ),
+          ),
+        ),
       );
     }
     if (!_trackedOpen) {
@@ -62,9 +72,11 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: recipe.heroImageUrl == null
-                  ? Container(
-                      color: Colors.orange.shade50,
-                      child: const Center(child: Icon(Icons.restaurant, size: 44)),
+                  ? const BrandedIllustrationSlot(
+                      title: 'Recipe hero illustration slot',
+                      subtitle: 'Replace with branded recipe_header.png artwork.',
+                      icon: Icons.flight_takeoff_outlined,
+                      height: 180,
                     )
                   : Image.network(
                       recipe.heroImageUrl!,
@@ -111,6 +123,13 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
           const Divider(),
           const Text('Available ingredients', style: TextStyle(fontWeight: FontWeight.bold)),
           ...recipe.availableIngredients.map((item) => ListTile(leading: const Icon(Icons.check_circle), title: Text(item))),
+          Card(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            child: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('Shopping handoff is built for quick wins: add all missing items, then launch your provider with one tap.'),
+            ),
+          ),
           const Divider(),
           const Text('Missing ingredients', style: TextStyle(fontWeight: FontWeight.bold)),
           if (recipe.missingIngredients.isEmpty)
@@ -191,7 +210,7 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                   context.pushShoppingList();
                 },
                 icon: const Icon(Icons.add_shopping_cart),
-                label: const Text('Add missing to shopping list'),
+                label: const Text('Add missing to shopping handoff'),
               ),
               FilledButton.icon(
                 onPressed: () async {

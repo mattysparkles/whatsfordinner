@@ -111,6 +111,12 @@ Use `--dart-define=GATEWAY_API_BASE_URL=https://your-gateway-host` and set:
 
 Mock mode still works unchanged for local demos (`USE_MOCKS=true`).
 
+
+## Product polish + store-readiness references
+
+- `docs/app_store_readiness.md` — screenshot checklist, privacy nutrition placeholders, release metadata, and reviewer demo flow.
+- `docs/app_icon_asset_pipeline.md` — app icon placeholder specs and bread-plane brand asset integration notes.
+
 ## Architecture at a glance
 
 See `architecture.md` for the full overview.

@@ -9,6 +9,7 @@ import '../../../core/models/app_models.dart';
 import '../../../core/services/analytics_service.dart';
 import '../../../core/services/user_error_messaging_service.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/branded_ui.dart';
 import '../../monetization/domain/ad_placement.dart';
 
 class ShoppingListScreen extends ConsumerWidget {
@@ -27,16 +28,24 @@ class ShoppingListScreen extends ConsumerWidget {
 
     if (list == null || list.items.isEmpty) {
       return const AppScaffold(
-        title: 'Shopping List',
+        title: 'Shopping handoff',
         adPlacement: AdPlacement.shoppingBanner,
         body: Center(
-          child: Text('No shopping list yet. Open a recipe and tap “Add missing to shopping list” to create one.'),
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: BrandedIllustrationSlot(
+              title: 'No handoff list yet',
+              subtitle: 'Open a recipe and tap “Add missing to shopping handoff” to create one.',
+              icon: Icons.shopping_basket_outlined,
+              height: 170,
+            ),
+          ),
         ),
       );
     }
 
     return AppScaffold(
-      title: 'Shopping List',
+      title: 'Shopping handoff',
       adPlacement: AdPlacement.shoppingBanner,
       body: ListView(
         children: [
@@ -96,7 +105,9 @@ class ShoppingListScreen extends ConsumerWidget {
             const SizedBox(height: 12),
             const LinearProgressIndicator(),
             const SizedBox(height: 8),
-            const Text('Generating shopping links...'),
+            const Text('Preparing provider links for your handoff...'),
+            const SizedBox(height: 8),
+            const BrandedLoadingSkeleton(rows: 3),
           ],
           if (linkGenerationState.hasError) ...[
             const SizedBox(height: 12),

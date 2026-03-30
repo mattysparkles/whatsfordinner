@@ -7,6 +7,7 @@ import '../../../app/providers.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/services/analytics_service.dart';
+import '../../../core/widgets/branded_ui.dart';
 import '../domain/cook_mode_services.dart';
 
 class CookModeScreen extends ConsumerStatefulWidget {
@@ -58,6 +59,7 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
   Widget build(BuildContext context) {
     final recipe = widget.seedRecipe ?? ref.watch(selectedRecipeProvider);
     final preferences = ref.watch(preferencesControllerProvider).valueOrNull;
+    final hasRecipe = recipe != null;
     final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
     final current = steps[_index.clamp(0, steps.length - 1)];
 
@@ -129,16 +131,26 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
                       child: Padding(
                         padding: const EdgeInsets.all(24),
                         child: Center(
-                          child: Text(
-                            current.instruction,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              height: 1.35,
-                              fontSize: 30 * _textScale,
-                              color: textColor,
-                            ),
-                          ),
+                          child: hasRecipe
+                              ? AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 220),
+                                  child: Text(
+                                    current.instruction,
+                                    key: ValueKey(_index),
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      height: 1.35,
+                                      fontSize: 30 * _textScale,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                )
+                              : const BrandedIllustrationSlot(
+                                  title: 'Cook mode ready when you are',
+                                  subtitle: 'Choose a recipe first, then PantryPilot will guide each step.',
+                                  icon: Icons.soup_kitchen_outlined,
+                                ),
                         ),
                       ),
                     ),
@@ -409,7 +421,8 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
         break;
       case VoiceCommand.startTimer:
         final recipe = widget.seedRecipe ?? ref.read(selectedRecipeProvider);
-        final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
+        final hasRecipe = recipe != null;
+    final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
         await _startTimerFor(steps[_index]);
         break;
       case VoiceCommand.pauseVoice:
@@ -445,6 +458,7 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
 
   String _currentInstruction() {
     final recipe = widget.seedRecipe ?? ref.read(selectedRecipeProvider);
+    final hasRecipe = recipe != null;
     final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
     return steps[_index].instruction;
   }

@@ -744,6 +744,21 @@ final recipeDiscoveryProvider = StateNotifierProvider<RecipeDiscoveryController,
 
 final recipeGenerationTickProvider = StateProvider<int>((_) => 0);
 
+
+final demoScriptModeProvider = StateProvider<bool>((_) => false);
+final demoScriptStepProvider = StateProvider<int>((_) => 0);
+
+void startDemoScriptMode(WidgetRef ref) {
+  ref.read(demoScriptModeProvider.notifier).state = true;
+  ref.read(demoScriptStepProvider.notifier).state = 0;
+}
+
+void advanceDemoScriptStep(WidgetRef ref) {
+  final current = ref.read(demoScriptStepProvider);
+  ref.read(demoScriptStepProvider.notifier).state = (current + 1).clamp(0, 4);
+}
+
+
 final recipeSuggestionsProvider = FutureProvider<List<core.RecipeSuggestion>>((ref) async {
   ref.watch(recipeGenerationTickProvider);
   final pantryItems = ref.watch(pantryControllerProvider).items;

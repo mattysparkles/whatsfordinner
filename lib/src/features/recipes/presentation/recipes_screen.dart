@@ -5,6 +5,7 @@ import '../../../app/app_navigation.dart';
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/widgets/app_scaffold.dart';
+import '../../../core/widgets/branded_ui.dart';
 import '../../monetization/domain/ad_placement.dart';
 import '../../monetization/presentation/widgets/monetization_widgets.dart';
 
@@ -48,6 +49,8 @@ class RecipesScreen extends ConsumerWidget {
                     Tab(text: 'Pantry Freestyle'),
                   ],
                 ),
+                const SizedBox(height: 8),
+                const _MatchEducationBanner(),
                 Expanded(
                   child: TabBarView(
                     children: [
@@ -61,13 +64,16 @@ class RecipesScreen extends ConsumerWidget {
             ),
           );
         },
-        loading: () => const Center(
+        loading: () => const SingleChildScrollView(
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              CircularProgressIndicator(),
+              BrandedIllustrationSlot(
+                title: 'PantryPilot is prepping ideas',
+                subtitle: 'Matching your pantry to dinner possibilities.',
+                icon: Icons.ramen_dining_outlined,
+              ),
               SizedBox(height: 12),
-              Text('Finding recipes from your pantry...'),
+              BrandedLoadingSkeleton(rows: 5),
             ],
           ),
         ),
@@ -104,7 +110,16 @@ class _RecipeList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (recipes.isEmpty) {
-      return const Center(child: Text('No suggestions yet for this category.'));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: BrandedIllustrationSlot(
+            title: 'No picks in this lane yet',
+            subtitle: 'Try another tab or adjust filters for broader suggestions.',
+            icon: Icons.menu_book_outlined,
+          ),
+        ),
+      );
     }
     return ListView.builder(
       itemCount: recipes.length + (showNativeAd ? 1 : 0),
@@ -189,4 +204,25 @@ class _RecipeCard extends StatelessWidget {
         RecipeMatchType.nearMatch => 'Almost there',
         RecipeMatchType.pantryFreestyle => 'Pantry Freestyle (creative AI output)',
       };
+}
+
+class _MatchEducationBanner extends StatelessWidget {
+  const _MatchEducationBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text('How matches work', style: TextStyle(fontWeight: FontWeight.w700)),
+            SizedBox(height: 6),
+            Text('Exact: you can cook now. Almost There: quick top-up trip. Pantry Freestyle: creative mode for fresh ideas.'),
+          ],
+        ),
+      ),
+    );
+  }
 }
