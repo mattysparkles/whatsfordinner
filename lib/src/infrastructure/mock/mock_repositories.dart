@@ -1,20 +1,69 @@
+import 'dart:convert';
+
 import '../../core/models/app_models.dart';
 import '../../core/repositories/favorites_repository.dart';
 import '../../core/repositories/pantry_repository.dart';
 import '../../core/repositories/preferences_repository.dart';
+import '../../domain/models/models.dart' as domain;
 
 class InMemoryPantryRepository implements PantryRepository {
-  List<PantryItem> _items = const [
-    PantryItem(id: 'item-1', name: 'pasta', quantity: 1, unit: 'box'),
-    PantryItem(id: 'item-2', name: 'tomato', quantity: 2, unit: 'can'),
+  List<domain.PantryItem> _items = [
+    domain.PantryItem(
+      id: 'item-1',
+      ingredient: const domain.Ingredient(
+        id: 'ingredient-pasta',
+        name: 'Pasta',
+        category: domain.IngredientCategory.grainsBread,
+      ),
+      quantityInfo: const domain.QuantityInfo(amount: 1, unit: 'box'),
+    ),
+    domain.PantryItem(
+      id: 'item-2',
+      ingredient: const domain.Ingredient(
+        id: 'ingredient-tomato',
+        name: 'Tomatoes',
+        category: domain.IngredientCategory.cannedJarred,
+      ),
+      quantityInfo: const domain.QuantityInfo(amount: 2, unit: 'cans'),
+      sourceType: domain.PantrySourceType.aiImport,
+      confidence: 0.84,
+    ),
   ];
 
   @override
-  Future<List<PantryItem>> fetchAll() async => _items;
+  Future<List<domain.PantryItem>> fetchAll() async => _items;
 
   @override
-  Future<void> saveAll(List<PantryItem> items) async {
+  Future<void> upsert(domain.PantryItem item) async {
+    final index = _items.indexWhere((existing) => existing.id == item.id);
+    if (index == -1) {
+      _items = [..._items, item];
+      return;
+    }
+    _items = [..._items]..[index] = item;
+  }
+
+  @override
+  Future<void> deleteById(String id) async {
+    _items = _items.where((item) => item.id != id).toList(growable: false);
+  }
+
+  @override
+  Future<void> saveAll(List<domain.PantryItem> items) async {
     _items = items;
+  }
+
+  @override
+  Future<String> exportToJson() async {
+    return jsonEncode(_items.map((item) => item.toJson()).toList(growable: false));
+  }
+
+  @override
+  Future<void> importFromJson(String json) async {
+    final decoded = (jsonDecode(json) as List<dynamic>)
+        .map((entry) => domain.PantryItem.fromJson(entry as Map<String, dynamic>))
+        .toList(growable: false);
+    _items = decoded;
   }
 }
 
