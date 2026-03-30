@@ -13,6 +13,7 @@ class EnvConfig {
     required this.featureEnableWebFallbackProvider,
     required this.featureEnableAds,
     required this.featureEnablePremiumFeatures,
+    required this.useFirebaseEmulators,
     this.recipeApiKey = '',
     this.visionApiKey = '',
     this.visionModel = 'gpt-4.1-mini',
@@ -46,6 +47,7 @@ class EnvConfig {
   final bool featureEnableWebFallbackProvider;
   final bool featureEnableAds;
   final bool featureEnablePremiumFeatures;
+  final bool useFirebaseEmulators;
 
   static EnvConfig fromDartDefines() {
     const env = String.fromEnvironment('APP_ENV', defaultValue: 'dev');
@@ -85,6 +87,7 @@ class EnvConfig {
       featureEnableWebFallbackProvider: bool.fromEnvironment('FEATURE_SHOPPING_WEB_FALLBACK', defaultValue: true),
       featureEnableAds: bool.fromEnvironment('FEATURE_ADS_ENABLED', defaultValue: true),
       featureEnablePremiumFeatures: bool.fromEnvironment('FEATURE_PREMIUM_ENABLED', defaultValue: true),
+      useFirebaseEmulators: bool.fromEnvironment('USE_FIREBASE_EMULATORS', defaultValue: false),
     );
   }
 }
