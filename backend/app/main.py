@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import asyncio
 import json
 import logging
 import time
@@ -8,6 +9,7 @@ import uuid
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from enum import Enum
 from typing import Any, Literal
 from urllib.parse import quote_plus
 
@@ -34,6 +36,13 @@ logger = logging.getLogger('pantry_gateway')
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 
 _rate_window: dict[str, deque[float]] = defaultdict(deque)
+_user_quota_window: dict[str, deque[float]] = defaultdict(deque)
+_device_quota_window: dict[str, deque[float]] = defaultdict(deque)
+
+
+class MeterKind(str, Enum):
+    vision = 'vision'
+    recipe = 'recipe'
 
 
 @dataclass(slots=True)
@@ -44,11 +53,40 @@ class _InstacartCacheEntry:
     message: str
 
 
+@dataclass(slots=True)
+class _AICacheEntry:
+    value: dict[str, Any]
+    expires_at: datetime
+
+
+@dataclass(slots=True)
+class _CircuitState:
+    failures: int = 0
+    opened_until: float = 0.0
+
+
+@dataclass(slots=True)
+class _EndpointMeter:
+    calls: int = 0
+    payload_bytes_total: int = 0
+    latency_ms_total: float = 0.0
+
+
 _instacart_url_cache: dict[str, _InstacartCacheEntry] = {}
+_ai_response_cache: dict[tuple[MeterKind, str], _AICacheEntry] = {}
+_openai_circuit: dict[MeterKind, _CircuitState] = defaultdict(_CircuitState)
+_meters: dict[MeterKind, _EndpointMeter] = defaultdict(_EndpointMeter)
 
 
 def _request_id(request: Request) -> str:
     return request.headers.get('x-request-id') or str(uuid.uuid4())
+
+
+def _client_identity(request: Request) -> tuple[str, str, str]:
+    ip = request.client.host if request.client else 'unknown'
+    user_id = request.headers.get('x-user-id') or f'anon:{ip}'
+    device_id = request.headers.get('x-device-id') or f'anon-device:{ip}'
+    return ip, user_id.strip(), device_id.strip()
 
 
 def _safe_error(code: str, message: str, request_id: str, status_code: int) -> HTTPException:
@@ -67,6 +105,60 @@ def _abuse_guard(client_id: str) -> bool:
     return True
 
 
+def _bounded_window_allow(window: dict[str, deque[float]], key: str, *, max_requests: int, seconds: int) -> bool:
+    now = time.time()
+    q = window[key]
+    while q and now - q[0] > seconds:
+        q.popleft()
+    if len(q) >= max_requests:
+        return False
+    q.append(now)
+    return True
+
+
+def _quota_guard(user_id: str, device_id: str) -> bool:
+    user_ok = _bounded_window_allow(_user_quota_window, user_id, max_requests=settings.user_quota_per_hour, seconds=3600)
+    device_ok = _bounded_window_allow(
+        _device_quota_window,
+        device_id,
+        max_requests=settings.device_quota_per_hour,
+        seconds=3600,
+    )
+    return user_ok and device_ok
+
+
+def _cache_key_from_payload(payload: dict[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(payload, sort_keys=True).encode('utf-8')).hexdigest()
+
+
+def _record_meter(kind: MeterKind, payload_bytes: int, latency_ms: float) -> dict[str, float | int]:
+    meter = _meters[kind]
+    meter.calls += 1
+    meter.payload_bytes_total += payload_bytes
+    meter.latency_ms_total += latency_ms
+    avg_payload = meter.payload_bytes_total / meter.calls
+    avg_latency = meter.latency_ms_total / meter.calls
+    return {
+        'calls': meter.calls,
+        'avgPayloadBytes': round(avg_payload, 2),
+        'avgLatencyMs': round(avg_latency, 2),
+    }
+
+
+def _safe_payload_summary(payload: dict[str, Any]) -> dict[str, Any]:
+    redacted = dict(payload)
+    messages = redacted.get('messages')
+    if isinstance(messages, list):
+        redacted['messageCount'] = len(messages)
+        redacted.pop('messages', None)
+    redacted.pop('input_image', None)
+    return redacted
+
+
+def _log_event(event: str, **fields: Any) -> None:
+    logger.info(json.dumps({'event': event, 'ts': datetime.now(UTC).isoformat(), **fields}, default=str))
+
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse:
     if isinstance(exc.detail, dict) and {'errorCode', 'userMessage', 'requestId'}.issubset(exc.detail):
@@ -77,23 +169,81 @@ async def http_exception_handler(_: Request, exc: HTTPException) -> JSONResponse
     )
 
 
-async def _openai_chat_completion(request_id: str, body: dict[str, Any]) -> dict[str, Any]:
+async def _openai_chat_completion(
+    request_id: str,
+    body: dict[str, Any],
+    *,
+    meter_kind: MeterKind,
+    cache_key: str,
+) -> dict[str, Any]:
+    circuit = _openai_circuit[meter_kind]
+    now = time.time()
+    if circuit.opened_until > now:
+        cached = _ai_response_cache.get((meter_kind, cache_key))
+        if cached and cached.expires_at > datetime.now(UTC):
+            _log_event('openai_circuit_fallback_cache_hit', requestId=request_id, kind=meter_kind.value)
+            return cached.value
+        raise _safe_error('upstream_unavailable', 'AI service is temporarily unavailable. Please try again.', request_id, 502)
+
     headers = {'Authorization': f'Bearer {settings.openai_api_key}', 'Content-Type': 'application/json'}
     timeout = httpx.Timeout(settings.request_timeout_seconds)
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        response = await client.post(f'{settings.openai_base_url}/chat/completions', headers=headers, json=body)
-    if response.status_code >= 400:
-        logger.warning(json.dumps({'event': 'openai_error', 'requestId': request_id, 'status': response.status_code}))
-        raise _safe_error('upstream_unavailable', 'AI service is temporarily unavailable. Please try again.', request_id, 502)
-    return response.json()
+    started = time.perf_counter()
+    payload_bytes = len(json.dumps(body).encode('utf-8'))
+
+    last_status: int | None = None
+    for attempt in range(settings.openai_max_retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(f'{settings.openai_base_url}/chat/completions', headers=headers, json=body)
+            if response.status_code < 500:
+                if response.status_code >= 400:
+                    _log_event('openai_error', requestId=request_id, status=response.status_code, kind=meter_kind.value)
+                    raise _safe_error('upstream_unavailable', 'AI service is temporarily unavailable. Please try again.', request_id, 502)
+                circuit.failures = 0
+                circuit.opened_until = 0.0
+                data = response.json()
+                _ai_response_cache[(meter_kind, cache_key)] = _AICacheEntry(
+                    value=data,
+                    expires_at=datetime.now(UTC) + timedelta(seconds=settings.ai_cache_ttl_seconds),
+                )
+                meter_rollup = _record_meter(meter_kind, payload_bytes, (time.perf_counter() - started) * 1000)
+                _log_event('ai_request_succeeded', requestId=request_id, kind=meter_kind.value, **meter_rollup)
+                return data
+            last_status = response.status_code
+        except httpx.HTTPError:
+            last_status = None
+
+        if attempt < settings.openai_max_retries:
+            backoff = settings.openai_retry_backoff_seconds * (2**attempt)
+            _log_event('openai_retrying', requestId=request_id, kind=meter_kind.value, attempt=attempt + 1, backoffSeconds=backoff)
+            await asyncio.sleep(backoff)
+
+    circuit.failures += 1
+    if circuit.failures >= settings.openai_circuit_fail_threshold:
+        circuit.opened_until = time.time() + settings.openai_circuit_reset_seconds
+    cached = _ai_response_cache.get((meter_kind, cache_key))
+    if cached and cached.expires_at > datetime.now(UTC):
+        _log_event(
+            'openai_failure_cache_fallback',
+            requestId=request_id,
+            kind=meter_kind.value,
+            failures=circuit.failures,
+            status=last_status,
+        )
+        return cached.value
+
+    _log_event('openai_failure', requestId=request_id, kind=meter_kind.value, failures=circuit.failures, status=last_status)
+    raise _safe_error('upstream_unavailable', 'AI service is temporarily unavailable. Please try again.', request_id, 502)
 
 
 @app.post('/vision/parse', response_model=VisionParseResponse)
 async def parse_vision(payload: VisionParseRequest, request: Request) -> VisionParseResponse:
     request_id = _request_id(request)
-    client_id = request.client.host if request.client else 'unknown'
+    client_id, user_id, device_id = _client_identity(request)
     if not _abuse_guard(client_id):
         raise _safe_error('rate_limited', 'Too many requests. Please try again shortly.', request_id, 429)
+    if not _quota_guard(user_id, device_id):
+        raise _safe_error('quota_exceeded', 'Request quota reached. Please try again later.', request_id, 429)
     if not settings.openai_api_key:
         raise _safe_error('misconfigured', 'Service is not configured right now.', request_id, 503)
 
@@ -113,8 +263,21 @@ async def parse_vision(payload: VisionParseRequest, request: Request) -> VisionP
         ],
         'temperature': 0.2,
     }
-    logger.info(json.dumps({'event': 'vision_parse_requested', 'requestId': request_id, 'imageCount': len(payload.images)}))
-    raw = await _openai_chat_completion(request_id, body)
+    cache_key = _cache_key_from_payload(payload.model_dump(by_alias=True))
+    cached = _ai_response_cache.get((MeterKind.vision, cache_key))
+    if cached and cached.expires_at > datetime.now(UTC):
+        raw = cached.value
+        _log_event('vision_parse_cache_hit', requestId=request_id, userId=user_id)
+    else:
+        _log_event(
+            'vision_parse_requested',
+            requestId=request_id,
+            userId=user_id,
+            imageCount=len(payload.images),
+            safeRequest=_safe_payload_summary(body),
+        )
+        raw = await _openai_chat_completion(request_id, body, meter_kind=MeterKind.vision, cache_key=cache_key)
+
     content = raw.get('choices', [{}])[0].get('message', {}).get('content', '{}')
     try:
         parsed = VisionParseResponse.model_validate(json.loads(content))
@@ -126,9 +289,11 @@ async def parse_vision(payload: VisionParseRequest, request: Request) -> VisionP
 @app.post('/recipes/suggest', response_model=RecipeSuggestResponse)
 async def suggest_recipes(payload: RecipeSuggestRequest, request: Request) -> RecipeSuggestResponse:
     request_id = _request_id(request)
-    client_id = request.client.host if request.client else 'unknown'
+    client_id, user_id, device_id = _client_identity(request)
     if not _abuse_guard(client_id):
         raise _safe_error('rate_limited', 'Too many requests. Please try again shortly.', request_id, 429)
+    if not _quota_guard(user_id, device_id):
+        raise _safe_error('quota_exceeded', 'Request quota reached. Please try again later.', request_id, 429)
     if not settings.openai_api_key:
         raise _safe_error('misconfigured', 'Service is not configured right now.', request_id, 503)
 
@@ -140,8 +305,21 @@ async def suggest_recipes(payload: RecipeSuggestRequest, request: Request) -> Re
         ],
         'temperature': 0.4,
     }
-    logger.info(json.dumps({'event': 'recipe_suggest_requested', 'requestId': request_id, 'pantryCount': len(payload.pantry_items)}))
-    raw = await _openai_chat_completion(request_id, body)
+    cache_key = _cache_key_from_payload(payload.model_dump(by_alias=True))
+    cached = _ai_response_cache.get((MeterKind.recipe, cache_key))
+    if cached and cached.expires_at > datetime.now(UTC):
+        raw = cached.value
+        _log_event('recipe_suggest_cache_hit', requestId=request_id, userId=user_id)
+    else:
+        _log_event(
+            'recipe_suggest_requested',
+            requestId=request_id,
+            userId=user_id,
+            pantryCount=len(payload.pantry_items),
+            safeRequest=_safe_payload_summary(body),
+        )
+        raw = await _openai_chat_completion(request_id, body, meter_kind=MeterKind.recipe, cache_key=cache_key)
+
     content = raw.get('choices', [{}])[0].get('message', {}).get('content', '{}')
     try:
         parsed = RecipeSuggestResponse.model_validate(json.loads(content))
@@ -277,13 +455,11 @@ async def _create_instacart_hosted_url(
                 json=request_body,
             )
     except httpx.HTTPError:
-        logger.warning(json.dumps({'event': 'instacart_connect_failed', 'requestId': request_id}))
+        _log_event('instacart_connect_failed', requestId=request_id)
         return _fallback_instacart_url(payload, page_type), None
 
     if response.status_code >= 400:
-        logger.warning(
-            json.dumps({'event': 'instacart_connect_error', 'requestId': request_id, 'status': response.status_code})
-        )
+        _log_event('instacart_connect_error', requestId=request_id, status=response.status_code)
         return _fallback_instacart_url(payload, page_type), None
 
     body = response.json() if response.content else {}
@@ -308,9 +484,11 @@ def _cache_default_expiration() -> datetime:
 @app.post('/shopping/instacart-link', response_model=InstacartLinkResponse)
 async def instacart_link(payload: InstacartLinkRequest, request: Request) -> InstacartLinkResponse:
     request_id = _request_id(request)
-    client_id = request.client.host if request.client else 'unknown'
+    client_id, user_id, device_id = _client_identity(request)
     if not _abuse_guard(client_id):
         raise _safe_error('rate_limited', 'Too many requests. Please try again shortly.', request_id, 429)
+    if not _quota_guard(user_id, device_id):
+        raise _safe_error('quota_exceeded', 'Request quota reached. Please try again later.', request_id, 429)
 
     page_type = _coerce_page_type(payload)
     line_items = _build_line_items(payload)
@@ -345,16 +523,13 @@ async def instacart_link(payload: InstacartLinkRequest, request: Request) -> Ins
         expires_at=expires_at,
         message=message,
     )
-    logger.info(
-        json.dumps(
-            {
-                'event': 'instacart_link_requested',
-                'requestId': request_id,
-                'itemCount': len(payload.items),
-                'pageType': page_type,
-                'fromCache': False,
-            }
-        )
+    _log_event(
+        'instacart_link_requested',
+        requestId=request_id,
+        userId=user_id,
+        itemCount=len(payload.items),
+        pageType=page_type,
+        fromCache=False,
     )
     return InstacartLinkResponse(
         checkoutUrl=checkout_url,
