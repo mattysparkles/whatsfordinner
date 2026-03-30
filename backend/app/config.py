@@ -11,6 +11,8 @@ class Settings(BaseSettings):
 
     instacart_partner_id: str = ''
     instacart_api_key: str = ''
+    instacart_api_base_url: str = 'https://connect.instacart.com'
+    instacart_hosted_link_ttl_seconds: int = 86400
 
     request_timeout_seconds: float = 30.0
     rate_limit_per_minute: int = 60

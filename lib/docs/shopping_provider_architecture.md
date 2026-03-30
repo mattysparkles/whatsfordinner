@@ -11,9 +11,9 @@ PantryPilot keeps shopping provider integrations outside core recipe/shopping do
 
 ## Adapter layers
 
-- **Instacart adapter**: checkout/search handoff links only (available now in mock mode).
+- **Instacart adapter**: backend-generated hosted shopping list + recipe page links, with cache and regeneration handled server-side.
 - **Amazon adapter**: product-level links with placeholder affiliate tag support (available now in mock mode).
-- **Generic web fallback adapter**: planned integration path, clearly labeled "coming later" in UI.
+- **Generic web fallback adapter**: remains decoupled from Instacart/Amazon and clearly labeled "coming later" in UI.
 
 ## Integration points for real providers
 

@@ -145,13 +145,27 @@ class ShoppingListController extends StateNotifier<ShoppingListState> {
 
   void setLinkResults(List<ShoppingLinkResult> links) {
     final listId = state.list?.id;
+    final merged = <String, ShoppingLinkResult>{
+      for (final existing in state.linkResults) existing.provider.id: existing,
+      for (final next in links) next.provider.id: next,
+    };
+    final mergedLinks = merged.values.toList(growable: false)
+      ..sort((a, b) => a.provider.name.compareTo(b.provider.name));
+
     if (listId == null) {
-      state = state.copyWith(linkResults: links);
+      state = state.copyWith(linkResults: mergedLinks);
       return;
     }
 
-    final nextMap = {...state.linksByListId, listId: links};
-    state = state.copyWith(linkResults: links, linksByListId: nextMap);
+    final previousForList = state.linksByListId[listId] ?? const <ShoppingLinkResult>[];
+    final mergedForList = <String, ShoppingLinkResult>{
+      for (final existing in previousForList) existing.provider.id: existing,
+      for (final next in links) next.provider.id: next,
+    }.values.toList(growable: false)
+      ..sort((a, b) => a.provider.name.compareTo(b.provider.name));
+
+    final nextMap = {...state.linksByListId, listId: mergedForList};
+    state = state.copyWith(linkResults: mergedLinks, linksByListId: nextMap);
   }
 
   static String _inferGroup(String name) {
