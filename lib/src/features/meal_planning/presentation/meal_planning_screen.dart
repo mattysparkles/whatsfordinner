@@ -122,7 +122,7 @@ class _MealPlanningScreenState extends ConsumerState<MealPlanningScreen> {
             (entry) => ListTile(
               leading: const Icon(Icons.event_note),
               title: Text(entry.recipeTitle),
-              subtitle: Text('${DateFormat.EEE().add_MMMd().format(entry.date)} • ${entry.sourceLabel}'),
+              subtitle: Text('${DateFormat('EEE').add_MMMd().format(entry.date)} • ${entry.sourceLabel}'),
             ),
           ),
           Wrap(

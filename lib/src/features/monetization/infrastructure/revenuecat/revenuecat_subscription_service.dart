@@ -87,11 +87,12 @@ class RevenueCatSubscriptionService implements SubscriptionService {
       throw const PurchaseFailure(PurchaseFailureReason.serviceUnavailable, message: 'Selected plan is unavailable.');
     }
 
+    final selectedProductId = selected.productId;
     try {
       final offerings = await Purchases.getOfferings();
       final current = offerings.current;
       final package = current?.availablePackages.firstWhere(
-        (p) => p.storeProduct.identifier == selected.productId,
+        (p) => p.storeProduct.identifier == selectedProductId,
         orElse: () => throw const PurchaseFailure(PurchaseFailureReason.serviceUnavailable, message: 'Offer package missing.'),
       );
       if (package == null) {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 import '../../../../app/providers.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/services/analytics_service.dart';
 import '../../domain/ad_placement.dart';
 import '../../domain/entitlements.dart';
