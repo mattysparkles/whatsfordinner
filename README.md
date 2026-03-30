@@ -1,65 +1,91 @@
-# PantryPilot (working title)
+# PantryPilot Flutter Scaffold
 
-PantryPilot is a Flutter MVP scaffold for helping users discover meals from ingredients they already have.
+Production-oriented first-pass scaffold for PantryPilot (iOS + Android), built with:
+- Flutter
+- Riverpod
+- GoRouter
+- Feature-first organization with clean architecture boundaries
+- Mock-ready service and persistence abstractions
 
-## Phase 1 Included
-- Cross-platform Flutter scaffold (iOS/Android-ready code architecture)
-- Onboarding, home, capture, pantry, recipe results/detail, cook mode, shopping list, preferences, and favorites/history screens
-- Recipe matching taxonomy (exact / near match / AI invention)
-- Mock AI parsing + mock recipe suggestion services
-- Manual pantry editing flow
-- Shopping list generation placeholders
-- Ad and premium architecture placeholders (service interfaces + premium badges)
-- Riverpod state management + GoRouter routing
-- Local storage bootstrap (Hive)
-- Unit + widget test examples
+## Quick Start
 
-## Setup
-1. Install Flutter SDK (3.22+ recommended) and platform toolchains.
-2. Copy env template:
-   ```bash
-   cp .env.example .env
-   ```
-3. Install dependencies:
+1. Install Flutter (stable channel, Dart 3.3+).
+2. Get packages:
    ```bash
    flutter pub get
    ```
-4. Run app:
+3. Run app:
    ```bash
    flutter run
    ```
-5. Run tests:
+4. Run tests:
    ```bash
    flutter test
    ```
 
-## Architecture Notes
+## Optional Runtime Config (Dart Defines)
 
-### Clean-ish layered structure
-- `lib/src/domain`: pure domain models + service/repository contracts
-- `lib/src/infrastructure`: mock implementations + persistence bootstrap
-- `lib/src/features`: feature-first UI screens
-- `lib/src/app`: router + DI providers
-- `lib/src/shared`: reusable UI primitives
+```bash
+flutter run \
+  --dart-define=APP_ENV=dev \
+  --dart-define=USE_MOCKS=true \
+  --dart-define=RECIPE_API_BASE_URL=https://example.com/recipes \
+  --dart-define=VISION_API_BASE_URL=https://example.com/vision
+```
 
-### Future integration extension points
-- **AI vision API**: replace `MockVisionParsingService` in `lib/src/infrastructure/mock/mock_services.dart`
-- **Recipe generation API**: replace `MockRecipeSuggestionService`
-- **Instacart/cart flow**: implement provider adapters behind `ShoppingLinkService`
-- **Amazon affiliate/product links**: add adapter implementation, keep external logic out of domain
-- **Delivery providers**: add adapters behind `ShoppingLinkService` or dedicated `DeliveryAdapter`
-- **Ads**: replace `MockAdService`; keep cook mode ad-free in UI composition
-- **Premium subscriptions**: replace `MockSubscriptionService` with store-backed service
+Available defines:
+- `APP_ENV`: `dev | staging | prod`
+- `USE_MOCKS`: `true | false`
+- `RECIPE_API_BASE_URL`
+- `VISION_API_BASE_URL`
+- `RECIPE_API_KEY`
+- `VISION_API_KEY`
 
-## TODO Integration Markers
-- Add image_picker/camera concrete capture adapters and permissions handling.
-- Add real OCR/vision parsing, confidence explanation provenance, and retry pipeline.
-- Add robust ingredient normalization and unit conversion pipeline.
-- Add persistent repositories using Hive boxes/typed adapters.
-- Add analytics, crash reporting, and feature flag remote config.
+## Architecture Snapshot
 
-## Product Guardrails Implemented
-- Recipe cards and detail pages explicitly show match type.
-- Capture flow exposes confidence and allows manual review.
-- Suggestions include “why this was suggested.”
-- Grocery providers are isolated behind abstraction interfaces.
+```text
+lib/src
+├── app/                   # app bootstrap, DI providers, router
+├── core/
+│   ├── config/            # env + app config providers
+│   ├── models/            # strongly typed app models
+│   ├── repositories/      # repository contracts
+│   ├── services/          # service contracts
+│   ├── theme/             # tokens + theme system (light/dark)
+│   ├── utils/             # utility constants/helpers
+│   └── widgets/           # shared reusable widgets
+├── features/
+│   ├── onboarding/
+│   ├── home/
+│   ├── capture/
+│   ├── pantry/
+│   ├── recipes/
+│   ├── cook_mode/
+│   ├── shopping_list/
+│   ├── preferences/
+│   ├── favorites_history/
+│   └── monetization/
+└── infrastructure/
+    ├── mock/              # mock services and in-memory repositories
+    └── persistence/       # local persistence adapters
+```
+
+## Implemented Navigation Flow
+
+- App starts at `/onboarding`
+- Onboarding CTA navigates to `/home`
+- Home provides links to all placeholder feature screens:
+  - capture
+  - pantry
+  - recipes
+  - cook mode
+  - shopping list
+  - preferences
+  - favorites/history
+  - monetization
+
+## Notes for Next Iteration
+
+- TODO(api): Replace mock services with production adapters behind `core/services` interfaces.
+- TODO(persistence): Move repository data from in-memory to durable local persistence.
+- TODO(features): Replace placeholder screens with real feature state + use cases.
