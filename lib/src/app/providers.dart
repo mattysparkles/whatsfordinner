@@ -11,6 +11,7 @@ import '../core/repositories/preferences_repository.dart';
 import '../core/services/recipe_service.dart';
 import '../core/services/vision_parsing_service.dart';
 import '../core/services/vision_service.dart';
+import '../core/services/pantry_intelligence_service.dart';
 import '../domain/models/models.dart';
 import '../features/capture/application/capture_import_service.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
@@ -41,6 +42,7 @@ final visionServiceProvider = Provider<VisionService>((ref) {
 
 
 final captureImportServiceProvider = Provider<CaptureImportService>((ref) => CaptureImportService());
+final pantryIntelligenceServiceProvider = Provider<PantryIntelligenceService>((ref) => const PantryIntelligenceService());
 
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);
@@ -180,11 +182,12 @@ class PantryState {
 }
 
 class PantryController extends StateNotifier<PantryState> {
-  PantryController(this._repo) : super(const PantryState(isLoading: true)) {
+  PantryController(this._repo, this._intelligence) : super(const PantryState(isLoading: true)) {
     load();
   }
 
   final PantryRepository _repo;
+  final PantryIntelligenceService _intelligence;
   static const _uuid = Uuid();
 
   Future<void> load() async {
@@ -206,26 +209,64 @@ class PantryController extends StateNotifier<PantryState> {
     PantrySourceType sourceType = PantrySourceType.manual,
     double confidence = 1,
     FreshnessState freshnessState = FreshnessState.unknown,
+    PantryItemProvenanceType provenanceType = PantryItemProvenanceType.manual,
+    String? provenanceSourceId,
+    DateTime? purchasedAt,
+    DateTime? storedAt,
+    DateTime? useSoonBy,
+    bool mergeCompatibleAliases = false,
   }) async {
     try {
       final now = DateTime.now();
-      final ingredientId = id == null ? _uuid.v4() : state.items.firstWhere((item) => item.id == id).ingredient.id;
+      final normalized = _intelligence.normalizeRaw(ingredientName);
+      final quantity = _intelligence.parseQuantity(ingredientName);
       final item = PantryItem(
         id: id ?? _uuid.v4(),
         ingredient: Ingredient(
-          id: ingredientId,
-          name: ingredientName.trim(),
-          normalizedName: ingredientName.trim().toLowerCase(),
+          id: id == null ? _uuid.v4() : state.items.firstWhere((existing) => existing.id == id).ingredient.id,
+          name: normalized.displayName,
+          normalizedName: normalized.canonicalName,
           category: category,
+          searchAliases: normalized.aliases,
         ),
-        quantityInfo: QuantityInfo(amount: amount, unit: (unit == null || unit.trim().isEmpty) ? null : unit.trim()),
+        quantityInfo: quantity ??
+            QuantityInfo(amount: amount, unit: (unit == null || unit.trim().isEmpty) ? null : unit.trim()),
         sourceType: sourceType,
         confidence: confidence,
         freshnessState: freshnessState,
         createdAt: id == null ? now : state.items.firstWhere((item) => item.id == id).createdAt,
         updatedAt: now,
+        purchasedAt: purchasedAt,
+        storedAt: storedAt ?? now,
+        useSoonBy: useSoonBy,
+        provenance: [
+          PantryItemProvenance(
+            type: provenanceType,
+            sourceId: provenanceSourceId,
+            recordedAt: now,
+            confidence: confidence,
+          ),
+        ],
       );
-      await _repo.upsert(item);
+      if (id != null) {
+        await _repo.upsert(item);
+        await load();
+        return;
+      }
+
+      PantryItem? mergeTarget;
+      for (final existing in state.items) {
+        if (existing.ingredient.normalizedName == item.ingredient.normalizedName) {
+          mergeTarget = existing;
+          break;
+        }
+        if (mergeCompatibleAliases && _intelligence.isAliasCompatible(existing.ingredient.name, item.ingredient.name)) {
+          mergeTarget = existing;
+          break;
+        }
+      }
+
+      await _repo.upsert(mergeTarget == null ? item : _intelligence.mergePantryItems(existing: mergeTarget, incoming: item));
       await load();
     } catch (error) {
       state = state.copyWith(errorMessage: 'Unable to save pantry item. ${error.toString()}');
@@ -271,7 +312,7 @@ class PantryController extends StateNotifier<PantryState> {
 }
 
 final pantryControllerProvider = StateNotifierProvider<PantryController, PantryState>(
-  (ref) => PantryController(ref.watch(pantryRepositoryProvider)),
+  (ref) => PantryController(ref.watch(pantryRepositoryProvider), ref.watch(pantryIntelligenceServiceProvider)),
 );
 
 final pantryQuickAddSuggestionsProvider = Provider<List<String>>((ref) {

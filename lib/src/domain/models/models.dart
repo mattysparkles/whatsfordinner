@@ -42,6 +42,62 @@ enum PantrySourceType {
 }
 
 enum FreshnessState { unknown, fresh, useSoon, expiring, expired }
+enum PantryItemProvenanceType { manual, captureSession, screenshotImport, recipeImport }
+
+class PantryItemProvenance {
+  const PantryItemProvenance({
+    required this.type,
+    this.sourceId,
+    this.recordedAt,
+    this.confidence,
+    this.notes,
+  });
+
+  final PantryItemProvenanceType type;
+  final String? sourceId;
+  final DateTime? recordedAt;
+  final double? confidence;
+  final String? notes;
+
+  PantryItemProvenance copyWith({
+    PantryItemProvenanceType? type,
+    String? sourceId,
+    DateTime? recordedAt,
+    double? confidence,
+    String? notes,
+    bool clearSourceId = false,
+    bool clearNotes = false,
+  }) {
+    return PantryItemProvenance(
+      type: type ?? this.type,
+      sourceId: clearSourceId ? null : (sourceId ?? this.sourceId),
+      recordedAt: recordedAt ?? this.recordedAt,
+      confidence: confidence ?? this.confidence,
+      notes: clearNotes ? null : (notes ?? this.notes),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'type': type.name,
+        'sourceId': sourceId,
+        'recordedAt': recordedAt?.toIso8601String(),
+        'confidence': confidence,
+        'notes': notes,
+      };
+
+  factory PantryItemProvenance.fromJson(Map<String, dynamic> json) {
+    return PantryItemProvenance(
+      type: PantryItemProvenanceType.values.firstWhere(
+        (value) => value.name == json['type'],
+        orElse: () => PantryItemProvenanceType.manual,
+      ),
+      sourceId: json['sourceId'] as String?,
+      recordedAt: json['recordedAt'] == null ? null : DateTime.parse(json['recordedAt'] as String),
+      confidence: (json['confidence'] as num?)?.toDouble(),
+      notes: json['notes'] as String?,
+    );
+  }
+}
 
 class Ingredient {
   const Ingredient({
@@ -137,6 +193,10 @@ class PantryItem {
     this.createdAt,
     this.updatedAt,
     this.notes,
+    this.provenance = const [],
+    this.purchasedAt,
+    this.storedAt,
+    this.useSoonBy,
   });
 
   final String id;
@@ -148,6 +208,10 @@ class PantryItem {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final String? notes;
+  final List<PantryItemProvenance> provenance;
+  final DateTime? purchasedAt;
+  final DateTime? storedAt;
+  final DateTime? useSoonBy;
 
   PantryItem copyWith({
     String? id,
@@ -159,6 +223,10 @@ class PantryItem {
     DateTime? createdAt,
     DateTime? updatedAt,
     String? notes,
+    List<PantryItemProvenance>? provenance,
+    DateTime? purchasedAt,
+    DateTime? storedAt,
+    DateTime? useSoonBy,
     bool clearNotes = false,
   }) {
     return PantryItem(
@@ -171,10 +239,23 @@ class PantryItem {
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       notes: clearNotes ? null : (notes ?? this.notes),
+      provenance: provenance ?? this.provenance,
+      purchasedAt: purchasedAt ?? this.purchasedAt,
+      storedAt: storedAt ?? this.storedAt,
+      useSoonBy: useSoonBy ?? this.useSoonBy,
     );
   }
 
   bool get hasAiConfidence => sourceType != PantrySourceType.manual && confidence < 1;
+
+  FreshnessState get estimatedFreshnessState {
+    if (freshnessState != FreshnessState.unknown) return freshnessState;
+    if (useSoonBy == null) return FreshnessState.unknown;
+    final today = DateTime.now();
+    if (useSoonBy!.isBefore(today)) return FreshnessState.expired;
+    if (useSoonBy!.difference(today).inDays <= 2) return FreshnessState.useSoon;
+    return FreshnessState.fresh;
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
@@ -186,6 +267,10 @@ class PantryItem {
         'createdAt': createdAt?.toIso8601String(),
         'updatedAt': updatedAt?.toIso8601String(),
         'notes': notes,
+        'provenance': provenance.map((entry) => entry.toJson()).toList(growable: false),
+        'purchasedAt': purchasedAt?.toIso8601String(),
+        'storedAt': storedAt?.toIso8601String(),
+        'useSoonBy': useSoonBy?.toIso8601String(),
       };
 
   factory PantryItem.fromJson(Map<String, dynamic> json) => PantryItem(
@@ -204,6 +289,12 @@ class PantryItem {
         createdAt: json['createdAt'] == null ? null : DateTime.parse(json['createdAt'] as String),
         updatedAt: json['updatedAt'] == null ? null : DateTime.parse(json['updatedAt'] as String),
         notes: json['notes'] as String?,
+        provenance: (json['provenance'] as List<dynamic>? ?? const [])
+            .map((entry) => PantryItemProvenance.fromJson(entry as Map<String, dynamic>))
+            .toList(growable: false),
+        purchasedAt: json['purchasedAt'] == null ? null : DateTime.parse(json['purchasedAt'] as String),
+        storedAt: json['storedAt'] == null ? null : DateTime.parse(json['storedAt'] as String),
+        useSoonBy: json['useSoonBy'] == null ? null : DateTime.parse(json['useSoonBy'] as String),
       );
 }
 

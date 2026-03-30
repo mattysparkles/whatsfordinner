@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pantry_pilot/src/app/providers.dart';
 import 'package:pantry_pilot/src/core/repositories/pantry_repository.dart';
+import 'package:pantry_pilot/src/core/services/pantry_intelligence_service.dart';
 import 'package:pantry_pilot/src/domain/models/models.dart';
 
 class _FakePantryRepository implements PantryRepository {
@@ -41,7 +42,7 @@ class _FakePantryRepository implements PantryRepository {
 void main() {
   test('pantry controller can add update and delete items', () async {
     final repository = _FakePantryRepository(const []);
-    final controller = PantryController(repository);
+    final controller = PantryController(repository, const PantryIntelligenceService());
     await controller.load();
 
     await controller.addOrUpdateItem(

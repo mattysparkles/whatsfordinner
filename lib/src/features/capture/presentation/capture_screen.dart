@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 
 import '../../../app/app_routes.dart';
 import '../../../app/providers.dart';
+import '../../../core/services/pantry_intelligence_service.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../domain/models/models.dart';
 import '../application/capture_import_service.dart';
@@ -209,8 +210,15 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               await controller.addOrUpdateItem(
                 ingredientName: ingredient.suggestedName,
                 category: ingredient.category,
+                amount: ingredient.inferredQuantity,
+                unit: ingredient.inferredUnit,
                 sourceType: PantrySourceType.aiImport,
                 confidence: ingredient.confidenceScore,
+                provenanceType: ingredient.sourceImageId.isNotEmpty
+                    ? PantryItemProvenanceType.captureSession
+                    : PantryItemProvenanceType.screenshotImport,
+                provenanceSourceId: ingredient.sourceImageId,
+                mergeCompatibleAliases: true,
               );
             }
           },
@@ -335,32 +343,8 @@ class _ParseReviewScreenState extends State<ParseReviewScreen> {
   }
 
   void _mergeDuplicates() {
-    final mergedByName = <String, ParsedIngredient>{};
-    for (final item in _items) {
-      final key = item.suggestedName.trim().toLowerCase();
-      final existing = mergedByName[key];
-      if (existing == null) {
-        mergedByName[key] = item;
-        continue;
-      }
-
-      mergedByName[key] = existing.copyWith(
-        confidenceScore: existing.confidenceScore >= item.confidenceScore ? existing.confidenceScore : item.confidenceScore,
-        parseConfidence: _higherConfidence(existing.parseConfidence, item.parseConfidence),
-        approved: existing.approved || item.approved,
-      );
-    }
-
-    setState(() => _items = mergedByName.values.toList(growable: false));
-  }
-
-  ParseConfidence _higherConfidence(ParseConfidence a, ParseConfidence b) {
-    const rank = {
-      ParseConfidence.unclear: 0,
-      ParseConfidence.possible: 1,
-      ParseConfidence.likely: 2,
-    };
-    return rank[a]! >= rank[b]! ? a : b;
+    final intelligence = const PantryIntelligenceService();
+    setState(() => _items = intelligence.mergeDuplicateDetections(_items));
   }
 }
 

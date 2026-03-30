@@ -101,9 +101,17 @@ class PantryScreen extends ConsumerWidget {
                                       child: ListTile(
                                         title: Text(item.ingredient.name),
                                         subtitle: Text(
-                                          '${item.quantityInfo.displayText} • ${_sourceLabel(item.sourceType)}'
+                                          '${item.quantityInfo.displayText} • ${_provenanceLabel(item)}'
+                                          ' • ${item.estimatedFreshnessState.name}'
                                           '${item.hasAiConfidence ? ' • ${((item.confidence * 100).round())}% confidence' : ''}',
                                         ),
+                                        isThreeLine: item.ingredient.normalizedName != null,
+                                        leading: item.ingredient.normalizedName == null
+                                            ? null
+                                            : Tooltip(
+                                                message: 'Normalized: ${item.ingredient.normalizedName}',
+                                                child: const Icon(Icons.auto_fix_high_outlined),
+                                              ),
                                         trailing: PopupMenuButton<String>(
                                           onSelected: (value) {
                                             if (value == 'edit') {
@@ -265,6 +273,7 @@ class _PantryItemEditorSheetState extends ConsumerState<_PantryItemEditorSheet> 
                       unit: _unitController.text,
                       sourceType: _sourceType,
                       confidence: _sourceType == PantrySourceType.manual ? 1 : 0.8,
+                      provenanceType: PantryItemProvenanceType.manual,
                     );
                 if (mounted) Navigator.of(context).pop();
               },
@@ -390,5 +399,19 @@ String _sourceLabel(PantrySourceType sourceType) {
       return 'Screenshot';
     case PantrySourceType.aiImport:
       return 'AI import';
+  }
+}
+
+String _provenanceLabel(PantryItem item) {
+  if (item.provenance.isEmpty) return _sourceLabel(item.sourceType);
+  switch (item.provenance.last.type) {
+    case PantryItemProvenanceType.manual:
+      return 'Manual';
+    case PantryItemProvenanceType.captureSession:
+      return 'Capture session';
+    case PantryItemProvenanceType.screenshotImport:
+      return 'Screenshot import';
+    case PantryItemProvenanceType.recipeImport:
+      return 'Recipe import';
   }
 }
