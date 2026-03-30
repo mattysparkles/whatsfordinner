@@ -6,6 +6,7 @@ import '../features/cook_mode/presentation/cook_mode_screen.dart';
 import '../features/favorites_history/presentation/favorites_history_screen.dart';
 import '../features/home/presentation/home_screen.dart';
 import '../features/monetization/presentation/monetization_screen.dart';
+import '../features/meal_planning/presentation/meal_planning_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/pantry/presentation/pantry_screen.dart';
 import '../features/preferences/presentation/about_screen.dart';
@@ -51,6 +52,7 @@ final appRouterProvider = Provider<GoRouter>(
         },
       ),
       GoRoute(path: AppRoutes.shoppingList, builder: (_, _) => const ShoppingListScreen()),
+      GoRoute(path: AppRoutes.mealPlanning, builder: (_, _) => const MealPlanningScreen()),
       GoRoute(path: AppRoutes.preferences, builder: (_, _) => const PreferencesScreen()),
       GoRoute(path: AppRoutes.about, builder: (_, _) => const AboutScreen()),
       GoRoute(path: AppRoutes.privacy, builder: (_, _) => const PrivacyScreen()),

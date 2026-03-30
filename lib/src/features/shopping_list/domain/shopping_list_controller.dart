@@ -95,6 +95,45 @@ class ShoppingListController extends StateNotifier<ShoppingListState> {
     );
   }
 
+  void createFromMealPlan({required String title, required List<RecipeSuggestion> recipes}) {
+    final mergedByName = <String, ShoppingListItem>{};
+    for (final recipe in recipes) {
+      for (final ingredient in recipe.missingIngredients) {
+        final normalized = '${ingredient.ingredientName.trim().toLowerCase()}::${ingredient.unit?.trim().toLowerCase() ?? 'unitless'}';
+        final existing = mergedByName[normalized];
+        final inferredNote = ingredient.suggestedSubstitutions.isEmpty
+            ? null
+            : 'Substitutions: ${ingredient.suggestedSubstitutions.join(', ')}';
+        if (existing == null) {
+          mergedByName[normalized] = ShoppingListItem(
+            id: _uuid.v4(),
+            ingredientName: ingredient.ingredientName.trim(),
+            groupLabel: _inferGroup(ingredient.ingredientName),
+            quantity: ingredient.shortageAmount,
+            unit: ingredient.unit,
+            note: inferredNote,
+          );
+          continue;
+        }
+
+        mergedByName[normalized] = existing.copyWith(
+          quantity: (existing.quantity ?? 0) + (ingredient.shortageAmount ?? 0),
+          note: _mergeNotes(existing.note, inferredNote),
+        );
+      }
+    }
+    final items = mergedByName.values.toList(growable: false);
+    state = state.copyWith(
+      list: ShoppingList(
+        id: _uuid.v4(),
+        title: title,
+        createdAt: DateTime.now(),
+        items: items,
+      ),
+      linkResults: const [],
+    );
+  }
+
   void toggleChecked(String itemId) {
     final list = state.list;
     if (list == null) return;

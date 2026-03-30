@@ -43,7 +43,7 @@ class RecipesScreen extends ConsumerWidget {
                 ),
                 const TabBar(
                   tabs: [
-                    Tab(text: 'Best Matches'),
+                    Tab(text: 'Exact'),
                     Tab(text: 'Almost There'),
                     Tab(text: 'Pantry Freestyle'),
                   ],
@@ -129,7 +129,7 @@ class _RecipeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final badgeText = recipe.isPantryFreestyle ? 'Pantry Freestyle (AI idea)' : recipe.matchType.label;
+    final badgeText = recipe.isPantryFreestyle ? 'Pantry Freestyle (Creative AI)' : recipe.matchType.label;
     return Card(
       child: InkWell(
         onTap: () => context.pushRecipeDetail(recipe),
@@ -138,6 +138,26 @@ class _RecipeCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: recipe.heroImageUrl == null
+                      ? Container(
+                          color: Colors.orange.shade50,
+                          child: const Center(child: Icon(Icons.restaurant_menu, size: 36)),
+                        )
+                      : Image.network(
+                          recipe.heroImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => Container(
+                            color: Colors.orange.shade50,
+                            child: const Center(child: Icon(Icons.image_not_supported_outlined, size: 32)),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 8),
               Text(recipe.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 4),
               Text(recipe.shortDescription),
@@ -154,11 +174,19 @@ class _RecipeCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              Text('Why suggested: ${recipe.explanation.summary}'),
+              Text(_explanationLabel(recipe.matchType), style: const TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 4),
+              Text(recipe.explanation.summary),
             ],
           ),
         ),
       ),
     );
   }
+
+  String _explanationLabel(RecipeMatchType matchType) => switch (matchType) {
+        RecipeMatchType.exact => 'Exact match',
+        RecipeMatchType.nearMatch => 'Almost there',
+        RecipeMatchType.pantryFreestyle => 'Pantry Freestyle (creative AI output)',
+      };
 }
