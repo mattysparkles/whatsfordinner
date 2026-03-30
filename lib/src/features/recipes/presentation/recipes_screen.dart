@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../app/app_routes.dart';
+import '../../../app/app_navigation.dart';
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/widgets/app_scaffold.dart';
@@ -133,7 +132,7 @@ class _RecipeCard extends StatelessWidget {
     final badgeText = recipe.isPantryFreestyle ? 'Pantry Freestyle (AI idea)' : recipe.matchType.label;
     return Card(
       child: InkWell(
-        onTap: () => context.push(AppRoutes.recipeDetail, extra: recipe),
+        onTap: () => context.pushRecipeDetail(recipe),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(

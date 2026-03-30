@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../core/widgets/app_scaffold.dart';
 import '../../../domain/models/models.dart';
-import '../../../shared/widgets/primary_scaffold.dart';
 
 class PantryScreen extends ConsumerWidget {
   const PantryScreen({super.key});
@@ -14,7 +14,7 @@ class PantryScreen extends ConsumerWidget {
     final controller = ref.read(pantryControllerProvider.notifier);
     final grouped = pantryState.groupedByCategory;
 
-    return PrimaryScaffold(
+    return AppScaffold(
       title: 'Pantry Inventory',
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showItemEditor(context, ref),

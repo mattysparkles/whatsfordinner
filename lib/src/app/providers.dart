@@ -34,19 +34,19 @@ export 'app_router.dart';
 final visionServiceProvider = Provider<VisionService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockVisionService();
-  return MockVisionService();
+  throw UnsupportedError('VisionService is not wired for production yet. Set USE_MOCKS=true.');
 });
 
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockVisionParsingService();
-  return MockVisionParsingService();
+  throw UnsupportedError('VisionParsingService is not wired for production yet. Set USE_MOCKS=true.');
 });
 
 final recipeServiceProvider = Provider<RecipeSuggestionService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockRecipeSuggestionService();
-  return MockRecipeSuggestionService();
+  throw UnsupportedError('RecipeSuggestionService is not wired for production yet. Set USE_MOCKS=true.');
 });
 
 
@@ -56,7 +56,11 @@ final _speechCommandBusProvider = Provider<InMemorySpeechCommandBus>((ref) {
   return bus;
 });
 
-final textToSpeechServiceProvider = Provider<TextToSpeechService>((ref) => MockTextToSpeechService());
+final textToSpeechServiceProvider = Provider<TextToSpeechService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return MockTextToSpeechService();
+  throw UnsupportedError('TextToSpeechService is mock-only right now. Set USE_MOCKS=true.');
+});
 
 final speechCommandServiceProvider = Provider<SpeechCommandService>((ref) => ref.watch(_speechCommandBusProvider));
 
@@ -64,15 +68,29 @@ final mockSpeechCommandEmitterProvider = Provider<MockSpeechCommandEmitter>((
   ref,
 ) => ref.watch(_speechCommandBusProvider));
 
-final keepScreenAwakeServiceProvider = Provider<KeepScreenAwakeService>((ref) => MockKeepScreenAwakeService());
+final keepScreenAwakeServiceProvider = Provider<KeepScreenAwakeService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return MockKeepScreenAwakeService();
+  throw UnsupportedError('KeepScreenAwakeService is mock-only right now. Set USE_MOCKS=true.');
+});
 
 final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return InMemoryPantryRepository();
   return LocalPantryRepository();
 });
-final preferencesRepositoryProvider = Provider<PreferencesRepository>((ref) => InMemoryPreferencesRepository());
-final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) => InMemoryFavoritesRepository());
+final preferencesRepositoryProvider = Provider<PreferencesRepository>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return InMemoryPreferencesRepository();
+  throw UnsupportedError('PreferencesRepository is not wired for production yet. Set USE_MOCKS=true.');
+});
+final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return InMemoryFavoritesRepository();
+  throw UnsupportedError('FavoritesRepository is not wired for production yet. Set USE_MOCKS=true.');
+});
+
+final selectedRecipeProvider = StateProvider<core.RecipeSuggestion?>((_) => null);
 
 class PantryFilters {
   const PantryFilters({this.category, this.sourceType, this.freshnessState});
@@ -391,7 +409,11 @@ List<core.RecipeSuggestion> _sortSuggestions(List<core.RecipeSuggestion> suggest
   return sorted;
 }
 
-final shoppingLinkServiceProvider = Provider<ShoppingLinkService>((ref) => MockShoppingLinkService());
+final shoppingLinkServiceProvider = Provider<ShoppingLinkService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return MockShoppingLinkService();
+  throw UnsupportedError('ShoppingLinkService is mock-only right now. Set USE_MOCKS=true.');
+});
 
 final shoppingProvidersProvider = Provider<List<core.CommerceProvider>>((ref) {
   return const [
@@ -425,12 +447,20 @@ final shoppingListControllerProvider = StateNotifierProvider<ShoppingListControl
 final shoppingLinkGenerationStateProvider = StateProvider<AsyncValue<void>>((_) => const AsyncData(null));
 
 final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (!config.useMocks) {
+    throw UnsupportedError('SubscriptionService is mock-only right now. Set USE_MOCKS=true.');
+  }
   final service = MockSubscriptionService();
   ref.onDispose(service.dispose);
   return service;
 });
 
-final adServiceProvider = Provider<AdService>((ref) => const MockAdService());
+final adServiceProvider = Provider<AdService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return const MockAdService();
+  throw UnsupportedError('AdService is mock-only right now. Set USE_MOCKS=true.');
+});
 
 class SubscriptionController extends StateNotifier<SubscriptionState> {
   SubscriptionController(this._service) : super(SubscriptionState.free()) {
