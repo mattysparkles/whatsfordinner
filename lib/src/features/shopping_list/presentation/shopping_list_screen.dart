@@ -6,6 +6,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
+import '../../../core/services/analytics_service.dart';
+import '../../../core/services/user_error_messaging_service.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../monetization/domain/ad_placement.dart';
 
@@ -26,7 +28,7 @@ class ShoppingListScreen extends ConsumerWidget {
         title: 'Shopping List',
         adPlacement: AdPlacement.shoppingBanner,
         body: Center(
-          child: Text('No shopping list yet. Add missing ingredients from a recipe first.'),
+          child: Text('No shopping list yet. Open a recipe and tap “Add missing to shopping list” to create one.'),
         ),
       );
     }
@@ -158,10 +160,23 @@ class ShoppingListScreen extends ConsumerWidget {
       final result = await service.buildLinks(list: list, providers: [provider]);
       ref.read(shoppingListControllerProvider.notifier).setLinkResults(result);
       ref.read(shoppingLinkGenerationStateProvider.notifier).state = const AsyncData(null);
+      await ref.read(analyticsServiceProvider).logEvent(
+        AppAnalyticsEvent.shoppingHandoffStarted,
+        parameters: {'provider': provider.id, 'itemCount': list.items.length},
+      );
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Built ${provider.name} shopping links.')));
+        ref.read(userErrorMessagingServiceProvider).show(
+          context,
+          message: UserMessage(title: 'Links ready', details: 'Built ${provider.name} shopping links.'),
+        );
       }
     } catch (error, stackTrace) {
+      await ref.read(crashReportingServiceProvider).recordError(
+        error,
+        stackTrace,
+        reason: 'Shopping link generation failed',
+        context: {'providerId': providerId},
+      );
       ref.read(shoppingLinkGenerationStateProvider.notifier).state = AsyncError(error, stackTrace);
     }
   }
@@ -170,7 +185,10 @@ class ShoppingListScreen extends ConsumerWidget {
     final text = _listAsText(ref.read(shoppingListControllerProvider).list);
     await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Shopping list copied.')));
+      ref.read(userErrorMessagingServiceProvider).show(
+        context,
+        message: const UserMessage(title: 'Copied', details: 'Shopping list copied.'),
+      );
     }
   }
 
@@ -178,9 +196,11 @@ class ShoppingListScreen extends ConsumerWidget {
     final text = _listAsText(ref.read(shoppingListControllerProvider).list);
     await Share.share(text, subject: 'PantryPilot shopping list');
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Opened share sheet. Recipients can shop from the list in their own apps.'),
+      ref.read(userErrorMessagingServiceProvider).show(
+        context,
+        message: const UserMessage(
+          title: 'Share started',
+          details: 'Opened share sheet. Recipients can shop from the list in their own apps.',
         ),
       );
     }
@@ -189,6 +209,10 @@ class ShoppingListScreen extends ConsumerWidget {
   Future<void> _openLink(BuildContext context, WidgetRef ref, Uri uri, {required String providerName}) async {
     final success = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (success) {
+      await ref.read(analyticsServiceProvider).logEvent(
+        AppAnalyticsEvent.shoppingHandoffStarted,
+        parameters: {'provider': providerName, 'mode': 'external_launch'},
+      );
       ref.read(shoppingLinkLaunchStateProvider.notifier).state = (true, 'Opened $providerName successfully.');
     } else {
       ref.read(shoppingLinkLaunchStateProvider.notifier).state = (

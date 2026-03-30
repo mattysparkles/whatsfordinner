@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/models/app_models.dart';
+import '../../../core/services/analytics_service.dart';
 import '../domain/cook_mode_services.dart';
 
 class CookModeScreen extends ConsumerStatefulWidget {
@@ -56,6 +57,7 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
   @override
   Widget build(BuildContext context) {
     final recipe = widget.seedRecipe ?? ref.watch(selectedRecipeProvider);
+    final preferences = ref.watch(preferencesControllerProvider).valueOrNull;
     final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
     final current = steps[_index.clamp(0, steps.length - 1)];
 
@@ -149,7 +151,16 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
                 const SizedBox(height: 8),
                 _buildTextSizeControl(textColor),
                 const SizedBox(height: 8),
-                if (ref.watch(appConfigProvider).useMocks) const _VoiceCommandPlaceholderRow(),
+                if (preferences != null && !preferences.aiVoiceDisclosureAcknowledged)
+                  Card(
+                    color: theme.colorScheme.secondaryContainer,
+                    child: const Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text('Voice guidance may be AI generated and may occasionally be wrong. Double-check critical steps.'),
+                    ),
+                  ),
+                if (ref.watch(appConfigProvider).useMocks && (preferences?.showMockControlsInDebug ?? true))
+                  const _VoiceCommandPlaceholderRow(),
               ],
             ),
           ),
@@ -259,6 +270,10 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
                         type: HistoryEventType.completedCookMode,
                         recipe: recipe,
                       );
+                  await ref.read(analyticsServiceProvider).logEvent(
+                    AppAnalyticsEvent.cookModeCompleted,
+                    parameters: {'recipeId': recipe.id, 'steps': recipe.steps.length},
+                  );
                 }
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(

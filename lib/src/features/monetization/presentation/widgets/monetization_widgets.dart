@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../app/providers.dart';
+import '../../../../core/services/analytics_service.dart';
 import '../../domain/ad_placement.dart';
 import '../../domain/entitlements.dart';
 import 'mock_ad_widgets.dart';
@@ -24,15 +25,32 @@ class AdPlacementSlot extends ConsumerWidget {
   }
 }
 
-class PremiumUpsellCard extends ConsumerWidget {
+class PremiumUpsellCard extends ConsumerStatefulWidget {
   const PremiumUpsellCard({super.key, this.compact = false});
 
   final bool compact;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PremiumUpsellCard> createState() => _PremiumUpsellCardState();
+}
+
+class _PremiumUpsellCardState extends ConsumerState<PremiumUpsellCard> {
+  bool _tracked = false;
+
+  @override
+  Widget build(BuildContext context) {
     final policy = ref.watch(monetizationPolicyProvider);
     final isPremium = policy.subscription.isPremium;
+
+    if (!_tracked && !isPremium) {
+      _tracked = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        ref.read(analyticsServiceProvider).logEvent(
+              AppAnalyticsEvent.premiumUpsellViewed,
+              parameters: {'compact': widget.compact},
+            );
+      });
+    }
 
     if (isPremium) {
       return Card(
@@ -65,7 +83,7 @@ class PremiumUpsellCard extends ConsumerWidget {
                 Chip(label: Text('Premium AI chef mode')),
               ],
             ),
-            if (!compact) ...[
+            if (!widget.compact) ...[
               const SizedBox(height: 10),
               FilledButton.icon(
                 onPressed: () => ref.read(subscriptionControllerProvider.notifier).upgradeToPremium(),

@@ -7,7 +7,9 @@ import 'package:path/path.dart' as p;
 
 import '../../../app/app_routes.dart';
 import '../../../app/providers.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/services/pantry_intelligence_service.dart';
+import '../../../core/services/user_error_messaging_service.dart';
 import '../../../core/widgets/app_scaffold.dart';
 import '../../../domain/models/models.dart';
 import '../application/capture_import_service.dart';
@@ -25,6 +27,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   bool _isParsing = false;
   bool _isImporting = false;
   String? _importErrorMessage;
+  bool _captureSessionTracked = false;
 
   @override
   void initState() {
@@ -102,7 +105,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   Text('Session images (${_images.length})', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: 8),
                   if (_images.isEmpty)
-                    const Text('No images added yet.')
+                    const Text('No images added yet. Start with camera capture or photo library import.')
                   else
                     ..._images.map(
                       (image) => ListTile(
@@ -138,6 +141,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     await _runImport(() async {
       final imported = await ref.read(captureImportServiceProvider).captureFromCamera(category: _selectedSource);
       setState(() => _images.addAll(imported));
+      await _trackCaptureSessionCreated();
     });
   }
 
@@ -148,6 +152,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             screenshotMode: false,
           );
       setState(() => _images.addAll(imported));
+      await _trackCaptureSessionCreated();
     });
   }
 
@@ -158,7 +163,18 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             screenshotMode: true,
           );
       setState(() => _images.addAll(imported));
+      await _trackCaptureSessionCreated();
     });
+  }
+
+
+  Future<void> _trackCaptureSessionCreated() async {
+    if (_captureSessionTracked || _images.isEmpty) return;
+    _captureSessionTracked = true;
+    await ref.read(analyticsServiceProvider).logEvent(
+      AppAnalyticsEvent.captureSessionCreated,
+      parameters: {'source': _selectedSource.name, 'imageCount': _images.length},
+    );
   }
 
   Future<void> _recoverLostImports() async {
@@ -166,8 +182,12 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       final recovered = await ref.read(captureImportServiceProvider).recoverLostImports();
       if (!mounted || recovered.isEmpty) return;
       setState(() => _images.addAll(recovered));
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Recovered ${recovered.length} image(s) from an interrupted import session.')),
+      ref.read(userErrorMessagingServiceProvider).show(
+        context,
+        message: UserMessage(
+          title: 'Import recovered',
+          details: 'Recovered ${recovered.length} image(s) from an interrupted import session.',
+        ),
       );
     } on CaptureImportException catch (error) {
       if (!mounted) return;
@@ -185,8 +205,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       await action();
     } on CaptureImportException catch (error) {
       setState(() => _importErrorMessage = error.message);
-    } catch (_) {
-      setState(() => _importErrorMessage = 'Something went wrong while importing. Please try again.');
+    } catch (error, stackTrace) {
+      ref.read(crashReportingServiceProvider).recordError(
+        error,
+        stackTrace,
+        reason: 'Capture import failed',
+      );
+      final mapped = ref.read(userErrorMessagingServiceProvider).map(error, fallbackTitle: 'Import failed');
+      setState(() => _importErrorMessage = mapped.details);
     } finally {
       if (mounted) {
         setState(() => _isImporting = false);
@@ -196,35 +222,57 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
   Future<void> _parseAndReview() async {
     setState(() => _isParsing = true);
-    final parseSession = await ref.read(visionParsingServiceProvider).parseSession(_images);
-    setState(() => _isParsing = false);
-    if (!mounted) return;
+    try {
+      final parseSession = await ref.read(visionParsingServiceProvider).parseSession(_images);
+      await ref.read(analyticsServiceProvider).logEvent(
+        AppAnalyticsEvent.parseSessionCompleted,
+        parameters: {
+          'images': _images.length,
+          'parsedIngredients': parseSession.parsedIngredients.length,
+          'recoverableErrors': parseSession.imageErrors.length,
+        },
+      );
+      if (!mounted) return;
 
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => ParseReviewScreen(
-          session: parseSession,
-          onApprove: (approvedIngredients) async {
-            final controller = ref.read(pantryControllerProvider.notifier);
-            for (final ingredient in approvedIngredients) {
-              await controller.addOrUpdateItem(
-                ingredientName: ingredient.suggestedName,
-                category: ingredient.category,
-                amount: ingredient.inferredQuantity,
-                unit: ingredient.inferredUnit,
-                sourceType: PantrySourceType.aiImport,
-                confidence: ingredient.confidenceScore,
-                provenanceType: ingredient.sourceImageId.isNotEmpty
-                    ? PantryItemProvenanceType.captureSession
-                    : PantryItemProvenanceType.screenshotImport,
-                provenanceSourceId: ingredient.sourceImageId,
-                mergeCompatibleAliases: true,
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => ParseReviewScreen(
+            session: parseSession,
+            onApprove: (approvedIngredients) async {
+              final controller = ref.read(pantryControllerProvider.notifier);
+              for (final ingredient in approvedIngredients) {
+                await controller.addOrUpdateItem(
+                  ingredientName: ingredient.suggestedName,
+                  category: ingredient.category,
+                  amount: ingredient.inferredQuantity,
+                  unit: ingredient.inferredUnit,
+                  sourceType: PantrySourceType.aiImport,
+                  confidence: ingredient.confidenceScore,
+                  provenanceType: ingredient.sourceImageId.isNotEmpty
+                      ? PantryItemProvenanceType.captureSession
+                      : PantryItemProvenanceType.screenshotImport,
+                  provenanceSourceId: ingredient.sourceImageId,
+                  mergeCompatibleAliases: true,
+                );
+              }
+              await ref.read(analyticsServiceProvider).logEvent(
+                AppAnalyticsEvent.pantryItemApproved,
+                parameters: {'approvedCount': approvedIngredients.length},
               );
-            }
-          },
+            },
+          ),
         ),
-      ),
-    );
+      );
+    } catch (error, stackTrace) {
+      ref.read(crashReportingServiceProvider).recordError(error, stackTrace, reason: 'Parse session failed');
+      if (!mounted) return;
+      final message = ref.read(userErrorMessagingServiceProvider).map(error, fallbackTitle: 'Could not analyze images');
+      ref.read(userErrorMessagingServiceProvider).show(context, message: message);
+    } finally {
+      if (mounted) {
+        setState(() => _isParsing = false);
+      }
+    }
   }
 }
 
@@ -338,7 +386,11 @@ class _ParseReviewScreenState extends State<ParseReviewScreen> {
     await widget.onApprove(_items.where((item) => item.approved).toList(growable: false));
     if (!mounted) return;
     setState(() => _isSaving = false);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Approved items added to inventory.')));
+    const messenger = UserErrorMessagingService();
+    messenger.show(
+      context,
+      message: const UserMessage(title: 'Inventory updated', details: 'Approved items added to inventory.'),
+    );
     context.go(AppRoutes.pantry);
   }
 

@@ -14,13 +14,27 @@ class OnboardingScreen extends StatelessWidget {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Cook smarter with what you already have.', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+          const Text('Turn pantry chaos into dinner plans.', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 12),
+          const Text(
+            '1) Capture ingredients\n'
+            '2) Approve what was detected\n'
+            '3) Get practical recipes you can cook tonight',
+          ),
           const SizedBox(height: 16),
-          const Text('Capture pantry items, review recognized ingredients, then get exact, near-match, or Pantry Freestyle recipes.'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                'Beta note: some experiences are mocked so demos remain stable while production integrations are finalized.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ),
           const Spacer(),
           FilledButton(
             onPressed: () => context.go(AppRoutes.home),
-            child: const Text('Get started'),
+            child: const Text('Start beta walkthrough'),
           ),
         ],
       ),

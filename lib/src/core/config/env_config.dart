@@ -6,6 +6,12 @@ class EnvConfig {
     required this.useMocks,
     required this.recipeApiBaseUrl,
     required this.visionApiBaseUrl,
+    required this.featureUseProductionAiServices,
+    required this.featureEnableInstacartProvider,
+    required this.featureEnableAmazonProvider,
+    required this.featureEnableWebFallbackProvider,
+    required this.featureEnableAds,
+    required this.featureEnablePremiumFeatures,
     this.recipeApiKey = '',
     this.visionApiKey = '',
     this.visionModel = 'gpt-4.1-mini',
@@ -32,6 +38,12 @@ class EnvConfig {
   final int recipeRequestTimeoutMs;
   final int recipeMaxRetries;
   final Duration recipeCacheTtl;
+  final bool featureUseProductionAiServices;
+  final bool featureEnableInstacartProvider;
+  final bool featureEnableAmazonProvider;
+  final bool featureEnableWebFallbackProvider;
+  final bool featureEnableAds;
+  final bool featureEnablePremiumFeatures;
 
   static EnvConfig fromDartDefines() {
     const env = String.fromEnvironment('APP_ENV', defaultValue: 'dev');
@@ -61,6 +73,12 @@ class EnvConfig {
       recipeRequestTimeoutMs: int.fromEnvironment('RECIPE_TIMEOUT_MS', defaultValue: 25000),
       recipeMaxRetries: int.fromEnvironment('RECIPE_MAX_RETRIES', defaultValue: 2),
       recipeCacheTtl: Duration(seconds: int.fromEnvironment('RECIPE_CACHE_TTL_SECONDS', defaultValue: 600)),
+      featureUseProductionAiServices: bool.fromEnvironment('FEATURE_USE_PRODUCTION_AI_SERVICES', defaultValue: false),
+      featureEnableInstacartProvider: bool.fromEnvironment('FEATURE_SHOPPING_INSTACART', defaultValue: true),
+      featureEnableAmazonProvider: bool.fromEnvironment('FEATURE_SHOPPING_AMAZON', defaultValue: true),
+      featureEnableWebFallbackProvider: bool.fromEnvironment('FEATURE_SHOPPING_WEB_FALLBACK', defaultValue: true),
+      featureEnableAds: bool.fromEnvironment('FEATURE_ADS_ENABLED', defaultValue: true),
+      featureEnablePremiumFeatures: bool.fromEnvironment('FEATURE_PREMIUM_ENABLED', defaultValue: true),
     );
   }
 }
