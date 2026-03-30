@@ -7,10 +7,12 @@ import '../core/repositories/favorites_repository.dart';
 import '../core/repositories/pantry_repository.dart';
 import '../core/repositories/preferences_repository.dart';
 import '../core/services/recipe_service.dart';
+import '../core/services/vision_parsing_service.dart';
 import '../core/services/vision_service.dart';
 import '../domain/models/models.dart';
 import '../infrastructure/mock/mock_repositories.dart';
 import '../infrastructure/mock/mock_services.dart';
+import '../infrastructure/mock/mock_vision_parsing_service.dart';
 import '../infrastructure/persistence/local_pantry_repository.dart';
 import 'app_router.dart';
 
@@ -20,6 +22,13 @@ final visionServiceProvider = Provider<VisionService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockVisionService();
   return MockVisionService();
+});
+
+final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  if (config.useMocks) return MockVisionParsingService();
+  // TODO(real-ai): Swap in production VisionParsingService implementation.
+  return MockVisionParsingService();
 });
 
 final recipeServiceProvider = Provider<RecipeService>((ref) {
