@@ -13,31 +13,194 @@ enum MealType {
 
 enum CaptureCategory { pantry, fridge, freezer, spiceRack, groceryScreenshot }
 
+enum IngredientCategory {
+  produce,
+  dairy,
+  meatSeafood,
+  grainsBread,
+  cannedJarred,
+  frozen,
+  baking,
+  spicesSeasonings,
+  oilsCondiments,
+  snacks,
+  beverages,
+  other,
+}
+
+enum PantrySourceType {
+  manual,
+  pantryPhoto,
+  fridgePhoto,
+  freezerPhoto,
+  groceryScreenshot,
+  aiImport,
+}
+
+enum FreshnessState { unknown, fresh, useSoon, expiring, expired }
+
 class Ingredient {
-  const Ingredient({required this.id, required this.name, this.normalizedName});
+  const Ingredient({
+    required this.id,
+    required this.name,
+    required this.category,
+    this.normalizedName,
+    this.searchAliases = const [],
+  });
+
   final String id;
   final String name;
+  final IngredientCategory category;
   final String? normalizedName;
+  final List<String> searchAliases;
+
+  Ingredient copyWith({
+    String? id,
+    String? name,
+    IngredientCategory? category,
+    String? normalizedName,
+    List<String>? searchAliases,
+  }) {
+    return Ingredient(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      category: category ?? this.category,
+      normalizedName: normalizedName ?? this.normalizedName,
+      searchAliases: searchAliases ?? this.searchAliases,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'category': category.name,
+        'normalizedName': normalizedName,
+        'searchAliases': searchAliases,
+      };
+
+  factory Ingredient.fromJson(Map<String, dynamic> json) => Ingredient(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        category: IngredientCategory.values.firstWhere(
+          (value) => value.name == json['category'],
+          orElse: () => IngredientCategory.other,
+        ),
+        normalizedName: json['normalizedName'] as String?,
+        searchAliases: (json['searchAliases'] as List<dynamic>? ?? const []).cast<String>(),
+      );
+}
+
+class QuantityInfo {
+  const QuantityInfo({this.amount, this.unit});
+
+  final double? amount;
+  final String? unit;
+
+  bool get isUnknown => amount == null;
+
+  String get displayText {
+    if (amount == null) return 'Unknown quantity';
+    final formatted = amount == amount!.roundToDouble() ? amount!.toInt().toString() : amount!.toString();
+    return unit == null || unit!.trim().isEmpty ? formatted : '$formatted $unit';
+  }
+
+  QuantityInfo copyWith({double? amount, String? unit, bool clearAmount = false, bool clearUnit = false}) {
+    return QuantityInfo(
+      amount: clearAmount ? null : (amount ?? this.amount),
+      unit: clearUnit ? null : (unit ?? this.unit),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'amount': amount,
+        'unit': unit,
+      };
+
+  factory QuantityInfo.fromJson(Map<String, dynamic> json) => QuantityInfo(
+        amount: (json['amount'] as num?)?.toDouble(),
+        unit: json['unit'] as String?,
+      );
 }
 
 class PantryItem {
   const PantryItem({
     required this.id,
     required this.ingredient,
-    this.quantity,
-    this.unit,
+    this.quantityInfo = const QuantityInfo(),
+    this.freshnessState = FreshnessState.unknown,
     this.confidence = 1,
-    this.source,
+    this.sourceType = PantrySourceType.manual,
+    this.createdAt,
+    this.updatedAt,
     this.notes,
   });
 
   final String id;
   final Ingredient ingredient;
-  final double? quantity;
-  final String? unit;
+  final QuantityInfo quantityInfo;
+  final FreshnessState freshnessState;
   final double confidence;
-  final String? source;
+  final PantrySourceType sourceType;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
   final String? notes;
+
+  PantryItem copyWith({
+    String? id,
+    Ingredient? ingredient,
+    QuantityInfo? quantityInfo,
+    FreshnessState? freshnessState,
+    double? confidence,
+    PantrySourceType? sourceType,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    String? notes,
+    bool clearNotes = false,
+  }) {
+    return PantryItem(
+      id: id ?? this.id,
+      ingredient: ingredient ?? this.ingredient,
+      quantityInfo: quantityInfo ?? this.quantityInfo,
+      freshnessState: freshnessState ?? this.freshnessState,
+      confidence: confidence ?? this.confidence,
+      sourceType: sourceType ?? this.sourceType,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      notes: clearNotes ? null : (notes ?? this.notes),
+    );
+  }
+
+  bool get hasAiConfidence => sourceType != PantrySourceType.manual && confidence < 1;
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'ingredient': ingredient.toJson(),
+        'quantityInfo': quantityInfo.toJson(),
+        'freshnessState': freshnessState.name,
+        'confidence': confidence,
+        'sourceType': sourceType.name,
+        'createdAt': createdAt?.toIso8601String(),
+        'updatedAt': updatedAt?.toIso8601String(),
+        'notes': notes,
+      };
+
+  factory PantryItem.fromJson(Map<String, dynamic> json) => PantryItem(
+        id: json['id'] as String,
+        ingredient: Ingredient.fromJson(json['ingredient'] as Map<String, dynamic>),
+        quantityInfo: QuantityInfo.fromJson(json['quantityInfo'] as Map<String, dynamic>? ?? const {}),
+        freshnessState: FreshnessState.values.firstWhere(
+          (value) => value.name == json['freshnessState'],
+          orElse: () => FreshnessState.unknown,
+        ),
+        confidence: (json['confidence'] as num?)?.toDouble() ?? 1,
+        sourceType: PantrySourceType.values.firstWhere(
+          (value) => value.name == json['sourceType'],
+          orElse: () => PantrySourceType.manual,
+        ),
+        createdAt: json['createdAt'] == null ? null : DateTime.parse(json['createdAt'] as String),
+        updatedAt: json['updatedAt'] == null ? null : DateTime.parse(json['updatedAt'] as String),
+        notes: json['notes'] as String?,
+      );
 }
 
 class CapturedImage {
