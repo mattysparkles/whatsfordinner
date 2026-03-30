@@ -23,7 +23,7 @@ class PreferencesScreen extends ConsumerWidget {
 
     return AppScaffold(
       title: 'Preferences',
-      adPlacement: AdPlacement.rewardsPrompt,
+      adPlacement: AdPlacement.homeBanner,
       body: prefsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Could not load preferences: $error')),

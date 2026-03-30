@@ -14,6 +14,10 @@ class EnvConfig {
     required this.featureEnableAds,
     required this.featureEnablePremiumFeatures,
     required this.useFirebaseEmulators,
+    required this.revenueCatApiKey,
+    required this.googleAdsBannerUnitId,
+    required this.googleAdsNativeUnitId,
+    required this.googleAdsNativeFactoryId,
     this.recipeApiKey = '',
     this.visionApiKey = '',
     this.visionModel = 'gpt-4.1-mini',
@@ -48,6 +52,10 @@ class EnvConfig {
   final bool featureEnableAds;
   final bool featureEnablePremiumFeatures;
   final bool useFirebaseEmulators;
+  final String revenueCatApiKey;
+  final String googleAdsBannerUnitId;
+  final String googleAdsNativeUnitId;
+  final String googleAdsNativeFactoryId;
 
   static EnvConfig fromDartDefines() {
     const env = String.fromEnvironment('APP_ENV', defaultValue: 'dev');
@@ -88,6 +96,16 @@ class EnvConfig {
       featureEnableAds: bool.fromEnvironment('FEATURE_ADS_ENABLED', defaultValue: true),
       featureEnablePremiumFeatures: bool.fromEnvironment('FEATURE_PREMIUM_ENABLED', defaultValue: true),
       useFirebaseEmulators: bool.fromEnvironment('USE_FIREBASE_EMULATORS', defaultValue: false),
+      revenueCatApiKey: const String.fromEnvironment('REVENUECAT_API_KEY', defaultValue: ''),
+      googleAdsBannerUnitId: const String.fromEnvironment(
+        'ADS_BANNER_UNIT_ID',
+        defaultValue: 'ca-app-pub-3940256099942544/6300978111',
+      ),
+      googleAdsNativeUnitId: const String.fromEnvironment(
+        'ADS_NATIVE_UNIT_ID',
+        defaultValue: 'ca-app-pub-3940256099942544/2247696110',
+      ),
+      googleAdsNativeFactoryId: const String.fromEnvironment('ADS_NATIVE_FACTORY_ID', defaultValue: ''),
     );
   }
 }

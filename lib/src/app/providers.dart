@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -30,9 +31,13 @@ import '../features/cook_mode/infrastructure/mock/mock_cook_mode_services.dart';
 import '../features/monetization/domain/ad_placement.dart';
 import '../features/monetization/domain/entitlements.dart';
 import '../features/monetization/domain/subscription_state.dart';
+import '../features/monetization/domain/monetization_models.dart';
 import '../features/monetization/infrastructure/mock/mock_monetization_services.dart';
+import '../features/monetization/infrastructure/revenuecat/revenuecat_subscription_service.dart';
+import '../features/monetization/infrastructure/ads/google_mobile_ads_service.dart';
 import '../features/monetization/services/ad_service.dart';
 import '../features/monetization/services/subscription_service.dart';
+import '../features/monetization/services/monetization_remote_config_service.dart';
 import '../features/shopping_list/domain/shopping_list_controller.dart';
 import '../features/shopping_list/domain/shopping_services.dart';
 import '../features/shopping_list/infrastructure/adapters/amazon_link_adapter.dart';
@@ -865,21 +870,53 @@ final shoppingLinkLaunchStateProvider = StateProvider<(bool, String)?>((
 
 final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
   final config = ref.watch(appConfigProvider);
-  final flags = ref.watch(appFeatureFlagsProvider);
-  if (!flags.enablePremiumFeatures || !config.useMocks) {
-    throw UnsupportedError('SubscriptionService is mock-only right now. Set USE_MOCKS=true.');
+  if (config.useMocks) {
+    final service = MockSubscriptionService();
+    ref.onDispose(service.dispose);
+    return service;
   }
-  final service = MockSubscriptionService();
+  final service = RevenueCatSubscriptionService(apiKey: config.revenueCatApiKey);
   ref.onDispose(service.dispose);
   return service;
 });
 
-final adServiceProvider = Provider<AdService>((ref) {
+final monetizationRemoteConfigServiceProvider = Provider<MonetizationRemoteConfigService>((ref) {
   final config = ref.watch(appConfigProvider);
   final flags = ref.watch(appFeatureFlagsProvider);
+  if (config.useMocks) {
+    return LocalMonetizationRemoteConfigService(
+      MonetizationRemoteFlags(
+        enableAds: flags.enableAds,
+        enablePremium: flags.enablePremiumFeatures,
+        enablePurchases: flags.enablePremiumFeatures,
+      ),
+    );
+  }
+  return FirebaseMonetizationRemoteConfigService(FirebaseRemoteConfig.instance);
+});
+
+class MonetizationRemoteFlagsController extends StateNotifier<MonetizationRemoteFlags> {
+  MonetizationRemoteFlagsController(this._service) : super(MonetizationRemoteFlags.safeDefaults) {
+    load();
+  }
+
+  final MonetizationRemoteConfigService _service;
+
+  Future<void> load() async {
+    state = await _service.fetchFlags();
+  }
+}
+
+final monetizationRemoteFlagsProvider = StateNotifierProvider<MonetizationRemoteFlagsController, MonetizationRemoteFlags>(
+  (ref) => MonetizationRemoteFlagsController(ref.watch(monetizationRemoteConfigServiceProvider)),
+);
+
+final adServiceProvider = Provider<AdService>((ref) {
+  final config = ref.watch(appConfigProvider);
+  final flags = ref.watch(monetizationRemoteFlagsProvider);
   if (!flags.enableAds) return const NoOpAdService();
   if (config.useMocks) return const MockAdService();
-  throw UnsupportedError('AdService is mock-only right now. Set USE_MOCKS=true.');
+  return GoogleMobileAdsService();
 });
 
 class SubscriptionController extends StateNotifier<SubscriptionState> {
@@ -889,13 +926,20 @@ class SubscriptionController extends StateNotifier<SubscriptionState> {
 
   final SubscriptionService _service;
   StreamSubscription<SubscriptionState>? _subscription;
+  List<PremiumProduct> offerings = const [];
 
   Future<void> _init() async {
     state = await _service.fetchCurrent();
     _subscription = _service.watchSubscription().listen((next) => state = next);
+    offerings = await _service.loadOfferings().catchError((_) => <PremiumProduct>[]);
   }
 
-  Future<void> upgradeToPremium() => _service.startPremiumCheckout();
+  Future<List<PremiumProduct>> loadOfferings() async {
+    offerings = await _service.loadOfferings();
+    return offerings;
+  }
+
+  Future<void> upgradeToPremium(PremiumPlanProduct plan) => _service.startPremiumCheckout(plan);
 
   Future<void> restorePurchases() => _service.restorePurchases();
 
@@ -923,19 +967,22 @@ class MonetizationPolicy {
     required this.entitlements,
     required this.adService,
     required this.featureFlags,
+    required this.remoteFlags,
   });
 
   final SubscriptionState subscription;
   final EntitlementSet entitlements;
   final AdService adService;
   final FeatureFlags featureFlags;
+  final MonetizationRemoteFlags remoteFlags;
 
   bool hasFeature(PremiumFeature feature) {
-    if (!featureFlags.enablePremiumFeatures) return false;
+    if (!featureFlags.enablePremiumFeatures || !remoteFlags.enablePremium) return false;
     return entitlements.has(feature);
   }
 
   bool shouldShowAd(AdPlacement placement) {
+    if (!remoteFlags.enableAds) return false;
     return adService.canRenderPlacement(placement: placement, subscription: subscription);
   }
 }
@@ -945,5 +992,12 @@ final monetizationPolicyProvider = Provider<MonetizationPolicy>((ref) {
   final entitlements = const EntitlementPolicy().resolve(subscription);
   final adService = ref.watch(adServiceProvider);
   final featureFlags = ref.watch(appFeatureFlagsProvider);
-  return MonetizationPolicy(subscription: subscription, entitlements: entitlements, adService: adService, featureFlags: featureFlags);
+  final remoteFlags = ref.watch(monetizationRemoteFlagsProvider);
+  return MonetizationPolicy(
+    subscription: subscription,
+    entitlements: entitlements,
+    adService: adService,
+    featureFlags: featureFlags,
+    remoteFlags: remoteFlags,
+  );
 });

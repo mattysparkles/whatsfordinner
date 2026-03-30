@@ -13,6 +13,7 @@ class MonetizationScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final subscription = ref.watch(subscriptionControllerProvider);
+    final remoteFlags = ref.watch(monetizationRemoteFlagsProvider);
 
     return AppScaffold(
       title: 'Premium & Monetization',
@@ -27,6 +28,15 @@ class MonetizationScreen extends ConsumerWidget {
                 subscription.isPremium
                     ? 'Ad-free and premium placeholders unlocked.'
                     : 'Ads may appear outside Cook Mode only.',
+              ),
+            ),
+          ),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.tune),
+              title: const Text('Monetization runtime settings'),
+              subtitle: Text(
+                'Ads: ${remoteFlags.enableAds ? 'on' : 'off'} • Premium: ${remoteFlags.enablePremium ? 'on' : 'off'} • Purchases: ${remoteFlags.enablePurchases ? 'on' : 'off'}',
               ),
             ),
           ),
@@ -67,7 +77,7 @@ class MonetizationScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           const AdPlacementSlot(placement: AdPlacement.recipesNative),
           const SizedBox(height: 8),
-          const AdPlacementSlot(placement: AdPlacement.rewardsPrompt),
+          const AdPlacementSlot(placement: AdPlacement.shoppingBanner),
         ],
       ),
     );
