@@ -27,14 +27,13 @@ final visionServiceProvider = Provider<VisionService>((ref) {
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockVisionParsingService();
-  // TODO(real-ai): Swap in production VisionParsingService implementation.
   return MockVisionParsingService();
 });
 
-final recipeServiceProvider = Provider<RecipeService>((ref) {
+final recipeServiceProvider = Provider<RecipeSuggestionService>((ref) {
   final config = ref.watch(appConfigProvider);
-  if (config.useMocks) return MockRecipeService();
-  return MockRecipeService();
+  if (config.useMocks) return MockRecipeSuggestionService();
+  return MockRecipeSuggestionService();
 });
 
 final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
@@ -93,14 +92,6 @@ class PantryState {
       return categoryMatch && sourceMatch && freshnessMatch && textMatch;
     }).toList(growable: false)
       ..sort((a, b) => a.ingredient.name.compareTo(b.ingredient.name));
-  }
-
-  Map<IngredientCategory, List<PantryItem>> get groupedByCategory {
-    final grouped = <IngredientCategory, List<PantryItem>>{};
-    for (final item in filteredItems) {
-      grouped.putIfAbsent(item.ingredient.category, () => []).add(item);
-    }
-    return grouped;
   }
 
   PantryState copyWith({
@@ -169,15 +160,6 @@ class PantryController extends StateNotifier<PantryState> {
 
   void setSearchQuery(String query) => state = state.copyWith(searchQuery: query);
 
-  void setCategoryFilter(IngredientCategory? category) =>
-      state = state.copyWith(filters: state.filters.copyWith(category: category, clearCategory: category == null));
-
-  void setSourceFilter(PantrySourceType? sourceType) =>
-      state = state.copyWith(filters: state.filters.copyWith(sourceType: sourceType, clearSource: sourceType == null));
-
-  void setFreshnessFilter(FreshnessState? freshnessState) => state =
-      state.copyWith(filters: state.filters.copyWith(freshnessState: freshnessState, clearFreshness: freshnessState == null));
-
   Future<String> exportJsonPlaceholder() => _repo.exportToJson();
 
   Future<void> importJsonPlaceholder(String jsonPayload) async {
@@ -191,26 +173,80 @@ final pantryControllerProvider = StateNotifierProvider<PantryController, PantryS
 );
 
 final pantryQuickAddSuggestionsProvider = Provider<List<String>>((ref) {
-  return const [
-    'Eggs',
-    'Milk',
-    'Butter',
-    'Olive oil',
-    'Garlic',
-    'Onion',
-    'Rice',
-    'Pasta',
-    'Black beans',
-    'Tomato sauce',
-  ];
+  return const ['Eggs', 'Milk', 'Butter', 'Olive oil', 'Garlic', 'Onion', 'Rice', 'Pasta', 'Spinach', 'Tomatoes'];
 });
 
-final selectedMealTypeProvider = StateProvider<core.MealType>((_) => core.MealType.dinner);
+class RecipeDiscoveryState {
+  const RecipeDiscoveryState({
+    this.mealType = core.MealType.dinner,
+    this.dietaryFilters = const {},
+    this.preferenceFilters = const {},
+    this.servings = 2,
+    this.sortOption = core.RecipeSortOption.fastest,
+  });
+
+  final core.MealType mealType;
+  final Set<String> dietaryFilters;
+  final Set<String> preferenceFilters;
+  final int servings;
+  final core.RecipeSortOption sortOption;
+
+  RecipeDiscoveryState copyWith({
+    core.MealType? mealType,
+    Set<String>? dietaryFilters,
+    Set<String>? preferenceFilters,
+    int? servings,
+    core.RecipeSortOption? sortOption,
+  }) {
+    return RecipeDiscoveryState(
+      mealType: mealType ?? this.mealType,
+      dietaryFilters: dietaryFilters ?? this.dietaryFilters,
+      preferenceFilters: preferenceFilters ?? this.preferenceFilters,
+      servings: servings ?? this.servings,
+      sortOption: sortOption ?? this.sortOption,
+    );
+  }
+}
+
+class RecipeDiscoveryController extends StateNotifier<RecipeDiscoveryState> {
+  RecipeDiscoveryController() : super(const RecipeDiscoveryState());
+
+  void setMealType(core.MealType type) => state = state.copyWith(mealType: type);
+
+  void toggleDietaryFilter(String tag) {
+    final next = {...state.dietaryFilters};
+    next.contains(tag) ? next.remove(tag) : next.add(tag);
+    state = state.copyWith(dietaryFilters: next);
+  }
+
+  void togglePreferenceFilter(String tag) {
+    final next = {...state.preferenceFilters};
+    next.contains(tag) ? next.remove(tag) : next.add(tag);
+    state = state.copyWith(preferenceFilters: next);
+  }
+
+  void setServings(int servings) => state = state.copyWith(servings: servings);
+  void setSortOption(core.RecipeSortOption option) => state = state.copyWith(sortOption: option);
+}
+
+final recipeDiscoveryProvider = StateNotifierProvider<RecipeDiscoveryController, RecipeDiscoveryState>(
+  (ref) => RecipeDiscoveryController(),
+);
+
+final recipeGenerationTickProvider = StateProvider<int>((_) => 0);
 
 final recipeSuggestionsProvider = FutureProvider<List<core.RecipeSuggestion>>((ref) async {
+  ref.watch(recipeGenerationTickProvider);
   final pantryItems = ref.watch(pantryControllerProvider).items;
-  final mealType = ref.watch(selectedMealTypeProvider);
-  final preferences = await ref.watch(preferencesRepositoryProvider).fetch();
+  final discovery = ref.watch(recipeDiscoveryProvider);
+  final preferencesRepo = ref.watch(preferencesRepositoryProvider);
+  final stored = await preferencesRepo.fetch();
+  final preferences = core.UserPreferences(
+    preferredMealTypes: [discovery.mealType],
+    householdSize: discovery.servings,
+    dietaryFilters: discovery.dietaryFilters.toList(),
+    preferenceFilters: [...stored.preferenceFilters, ...discovery.preferenceFilters].toSet().toList(),
+  );
   final service = ref.watch(recipeServiceProvider);
   final mappedItems = pantryItems
       .map(
@@ -222,5 +258,27 @@ final recipeSuggestionsProvider = FutureProvider<List<core.RecipeSuggestion>>((r
         ),
       )
       .toList(growable: false);
-  return service.suggestRecipes(pantryItems: mappedItems, mealType: mealType, preferences: preferences);
+
+  final suggestions = await service.suggestRecipes(
+    pantryItems: mappedItems,
+    mealType: discovery.mealType,
+    preferences: preferences,
+    servings: discovery.servings,
+  );
+  return _sortSuggestions(suggestions, discovery.sortOption);
 });
+
+List<core.RecipeSuggestion> _sortSuggestions(List<core.RecipeSuggestion> suggestions, core.RecipeSortOption sortOption) {
+  final sorted = [...suggestions];
+  sorted.sort((a, b) {
+    return switch (sortOption) {
+      core.RecipeSortOption.fastest => a.totalMinutes.compareTo(b.totalMinutes),
+      core.RecipeSortOption.easiest => a.difficulty.compareTo(b.difficulty),
+      core.RecipeSortOption.fewestMissingIngredients => a.missingIngredients.length.compareTo(b.missingIngredients.length),
+      core.RecipeSortOption.familyFriendly => b.familyFriendlyScore.compareTo(a.familyFriendlyScore),
+      core.RecipeSortOption.healthier => b.healthScore.compareTo(a.healthScore),
+      core.RecipeSortOption.fancy => b.fancyScore.compareTo(a.fancyScore),
+    };
+  });
+  return sorted;
+}

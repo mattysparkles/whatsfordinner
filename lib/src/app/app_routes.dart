@@ -4,6 +4,7 @@ abstract final class AppRoutes {
   static const capture = '/capture';
   static const pantry = '/pantry';
   static const recipes = '/recipes';
+  static const recipeDetail = '/recipes/detail';
   static const cookMode = '/cook-mode';
   static const shoppingList = '/shopping-list';
   static const preferences = '/preferences';
