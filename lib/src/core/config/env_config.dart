@@ -4,6 +4,7 @@ class EnvConfig {
   const EnvConfig({
     required this.environment,
     required this.useMocks,
+    required this.gatewayApiBaseUrl,
     required this.recipeApiBaseUrl,
     required this.visionApiBaseUrl,
     required this.featureUseProductionAiServices,
@@ -26,6 +27,7 @@ class EnvConfig {
 
   final AppEnvironment environment;
   final bool useMocks;
+  final String gatewayApiBaseUrl;
   final String recipeApiBaseUrl;
   final String visionApiBaseUrl;
   final String recipeApiKey;
@@ -55,6 +57,10 @@ class EnvConfig {
         orElse: () => AppEnvironment.dev,
       ),
       useMocks: useMocks,
+      gatewayApiBaseUrl: const String.fromEnvironment(
+        'GATEWAY_API_BASE_URL',
+        defaultValue: 'http://localhost:8000',
+      ),
       recipeApiBaseUrl: const String.fromEnvironment(
         'RECIPE_API_BASE_URL',
         defaultValue: 'https://example.com/recipes',

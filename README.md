@@ -75,6 +75,42 @@ Android startup now attempts `ImagePicker.retrieveLostData()` to recover interru
 
 ---
 
+
+## Backend gateway (FastAPI)
+
+Production mode now uses a **backend gateway** so the mobile app never sends OpenAI or Instacart secrets from the client.
+
+### Endpoints
+- `POST /vision/parse`
+- `POST /recipes/suggest`
+- `POST /shopping/instacart-link`
+
+### Local backend run
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+### Backend environment variables
+Set these on the backend host (or local shell), never in Flutter mobile builds:
+- `PANTRY_GATEWAY_OPENAI_API_KEY`
+- `PANTRY_GATEWAY_OPENAI_MODEL_VISION`
+- `PANTRY_GATEWAY_OPENAI_MODEL_RECIPE`
+- `PANTRY_GATEWAY_OPENAI_BASE_URL`
+- `PANTRY_GATEWAY_INSTACART_PARTNER_ID`
+- `PANTRY_GATEWAY_INSTACART_API_KEY`
+- `PANTRY_GATEWAY_RATE_LIMIT_PER_MINUTE`
+
+### Flutter production wiring
+Use `--dart-define=GATEWAY_API_BASE_URL=https://your-gateway-host` and set:
+- `USE_MOCKS=false`
+- `FEATURE_USE_PRODUCTION_AI_SERVICES=true`
+
+Mock mode still works unchanged for local demos (`USE_MOCKS=true`).
+
 ## Architecture at a glance
 
 See `architecture.md` for the full overview.

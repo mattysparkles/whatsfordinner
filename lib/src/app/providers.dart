@@ -33,13 +33,15 @@ import '../features/shopping_list/domain/shopping_list_controller.dart';
 import '../features/shopping_list/domain/shopping_services.dart';
 import '../features/shopping_list/infrastructure/adapters/amazon_link_adapter.dart';
 import '../features/shopping_list/infrastructure/adapters/instacart_link_adapter.dart';
+import '../features/shopping_list/infrastructure/adapters/backend/backend_instacart_link_adapter.dart';
 import '../features/shopping_list/infrastructure/adapters/shopping_link_service_impl.dart';
 import '../features/shopping_list/infrastructure/adapters/web_fallback_adapter.dart';
 import '../infrastructure/mock/mock_repositories.dart';
 import '../infrastructure/mock/mock_services.dart';
-import '../infrastructure/recipes/openai/openai_recipe_suggestion_service.dart';
+import '../infrastructure/gateway/gateway_recipe_suggestion_service.dart';
 import '../infrastructure/mock/mock_vision_parsing_service.dart';
-import '../infrastructure/vision/openai/openai_vision_parsing_service.dart';
+import '../infrastructure/gateway/gateway_vision_parsing_service.dart';
+import '../infrastructure/gateway/pantry_gateway_client.dart';
 import '../infrastructure/persistence/hive_local_persistence.dart';
 import '../infrastructure/persistence/local_favorites_repository.dart';
 import '../infrastructure/persistence/local_pantry_repository.dart';
@@ -74,18 +76,23 @@ final visionServiceProvider = Provider<VisionService>((ref) {
 final captureImportServiceProvider = Provider<CaptureImportService>((ref) => CaptureImportService());
 final pantryIntelligenceServiceProvider = Provider<PantryIntelligenceService>((ref) => const PantryIntelligenceService());
 
+final pantryGatewayClientProvider = Provider<PantryGatewayClient>((ref) {
+  final config = ref.watch(appConfigProvider);
+  return PantryGatewayClient(baseUrl: config.gatewayApiBaseUrl);
+});
+
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);
   final flags = ref.watch(appFeatureFlagsProvider);
   if (config.useMocks || !flags.useProductionAiServices) return MockVisionParsingService();
-  return OpenAiVisionParsingService(config: config);
+  return GatewayVisionParsingService(client: ref.watch(pantryGatewayClientProvider));
 });
 
 final recipeServiceProvider = Provider<RecipeSuggestionService>((ref) {
   final config = ref.watch(appConfigProvider);
   final flags = ref.watch(appFeatureFlagsProvider);
   if (config.useMocks || !flags.useProductionAiServices) return MockRecipeSuggestionService();
-  return OpenAiRecipeSuggestionService(config: config);
+  return GatewayRecipeSuggestionService(client: ref.watch(pantryGatewayClientProvider));
 });
 
 
@@ -692,8 +699,12 @@ List<core.RecipeSuggestion> _sortSuggestions(List<core.RecipeSuggestion> suggest
 
 final shoppingLinkServiceProvider = Provider<ShoppingLinkService>((ref) {
   final flags = ref.watch(appFeatureFlagsProvider);
+  final config = ref.watch(appConfigProvider);
   final adapters = <ShoppingProviderAdapter>[
-    if (flags.enableInstacartProvider) InstacartLinkAdapter(),
+    if (flags.enableInstacartProvider)
+      (config.useMocks || !flags.useProductionAiServices
+          ? InstacartLinkAdapter()
+          : BackendInstacartLinkAdapter(client: ref.watch(pantryGatewayClientProvider))),
     if (flags.enableAmazonProvider) AmazonLinkAdapter(),
     if (flags.enableWebFallbackProvider) WebFallbackAdapter(),
   ];
