@@ -25,7 +25,10 @@ import '../features/monetization/services/ad_service.dart';
 import '../features/monetization/services/subscription_service.dart';
 import '../features/shopping_list/domain/shopping_list_controller.dart';
 import '../features/shopping_list/domain/shopping_services.dart';
-import '../features/shopping_list/infrastructure/mock/mock_shopping_link_service.dart';
+import '../features/shopping_list/infrastructure/adapters/amazon_link_adapter.dart';
+import '../features/shopping_list/infrastructure/adapters/instacart_link_adapter.dart';
+import '../features/shopping_list/infrastructure/adapters/shopping_link_service_impl.dart';
+import '../features/shopping_list/infrastructure/adapters/web_fallback_adapter.dart';
 import '../infrastructure/mock/mock_repositories.dart';
 import '../infrastructure/mock/mock_services.dart';
 import '../infrastructure/recipes/openai/openai_recipe_suggestion_service.dart';
@@ -644,9 +647,13 @@ List<core.RecipeSuggestion> _sortSuggestions(List<core.RecipeSuggestion> suggest
 }
 
 final shoppingLinkServiceProvider = Provider<ShoppingLinkService>((ref) {
-  final config = ref.watch(appConfigProvider);
-  if (config.useMocks) return MockShoppingLinkService();
-  throw UnsupportedError('ShoppingLinkService is mock-only right now. Set USE_MOCKS=true.');
+  return ShoppingLinkServiceImpl(
+    adapters: [
+      InstacartLinkAdapter(),
+      AmazonLinkAdapter(),
+      WebFallbackAdapter(),
+    ],
+  );
 });
 
 final shoppingProvidersProvider = Provider<List<core.CommerceProvider>>((ref) {
@@ -654,16 +661,16 @@ final shoppingProvidersProvider = Provider<List<core.CommerceProvider>>((ref) {
     core.CommerceProvider(
       id: 'instacart',
       name: 'Instacart',
-      capabilityLabel: core.ProviderCapabilityLabel.availableNow,
+      capabilityLabel: core.ProviderCapabilityLabel.active,
       supportsAffiliateTracking: true,
-      notes: 'Mock handoff only; no direct account sync.',
+      notes: 'Open in Instacart with prefilled list context.',
     ),
     core.CommerceProvider(
       id: 'amazon',
       name: 'Amazon',
-      capabilityLabel: core.ProviderCapabilityLabel.availableNow,
+      capabilityLabel: core.ProviderCapabilityLabel.configuredButUnavailable,
       supportsAffiliateTracking: true,
-      notes: 'Product search links now, affiliate enhancements later.',
+      notes: 'Configured fallback for item-by-item product searches.',
     ),
     core.CommerceProvider(
       id: 'web-fallback',
@@ -679,6 +686,9 @@ final shoppingListControllerProvider = StateNotifierProvider<ShoppingListControl
 );
 
 final shoppingLinkGenerationStateProvider = StateProvider<AsyncValue<void>>((_) => const AsyncData(null));
+final shoppingLinkLaunchStateProvider = StateProvider<(bool, String)?>((
+  _,
+) => null);
 
 final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
   final config = ref.watch(appConfigProvider);

@@ -32,7 +32,7 @@ class MockInstacartAdapter implements InstacartProviderAdapter {
   CommerceProvider get provider => const CommerceProvider(
         id: 'instacart',
         name: 'Instacart',
-        capabilityLabel: ProviderCapabilityLabel.availableNow,
+        capabilityLabel: ProviderCapabilityLabel.active,
         supportsAffiliateTracking: true,
         notes: 'Mock checkout handoff only; no direct account sync in MVP.',
       );
@@ -54,7 +54,7 @@ class MockAmazonAdapter implements AmazonProviderAdapter {
   CommerceProvider get provider => const CommerceProvider(
         id: 'amazon',
         name: 'Amazon',
-        capabilityLabel: ProviderCapabilityLabel.availableNow,
+        capabilityLabel: ProviderCapabilityLabel.active,
         supportsAffiliateTracking: true,
         notes: 'Generates product search links; affiliate tags can be appended later.',
       );
