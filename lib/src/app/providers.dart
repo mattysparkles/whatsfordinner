@@ -12,6 +12,9 @@ import '../core/services/vision_service.dart';
 import '../domain/models/models.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
 import '../features/cook_mode/infrastructure/mock/mock_cook_mode_services.dart';
+import '../features/shopping_list/domain/shopping_list_controller.dart';
+import '../features/shopping_list/domain/shopping_services.dart';
+import '../features/shopping_list/infrastructure/mock/mock_shopping_link_service.dart';
 import '../infrastructure/mock/mock_repositories.dart';
 import '../infrastructure/mock/mock_services.dart';
 import '../infrastructure/mock/mock_vision_parsing_service.dart';
@@ -301,3 +304,34 @@ List<core.RecipeSuggestion> _sortSuggestions(List<core.RecipeSuggestion> suggest
   });
   return sorted;
 }
+
+final shoppingLinkServiceProvider = Provider<ShoppingLinkService>((ref) => MockShoppingLinkService());
+
+final shoppingProvidersProvider = Provider<List<core.CommerceProvider>>((ref) {
+  return const [
+    core.CommerceProvider(
+      id: 'instacart',
+      name: 'Instacart',
+      capabilityLabel: core.ProviderCapabilityLabel.availableNow,
+      supportsAffiliateTracking: true,
+      notes: 'Mock handoff only; no direct account sync.',
+    ),
+    core.CommerceProvider(
+      id: 'amazon',
+      name: 'Amazon',
+      capabilityLabel: core.ProviderCapabilityLabel.availableNow,
+      supportsAffiliateTracking: true,
+      notes: 'Product search links now, affiliate enhancements later.',
+    ),
+    core.CommerceProvider(
+      id: 'web-fallback',
+      name: 'Web Search',
+      capabilityLabel: core.ProviderCapabilityLabel.comingLater,
+      notes: 'Generic fallback adapter intentionally marked as coming later.',
+    ),
+  ];
+});
+
+final shoppingListControllerProvider = StateNotifierProvider<ShoppingListController, ShoppingListState>(
+  (ref) => ShoppingListController(providers: ref.watch(shoppingProvidersProvider)),
+);
