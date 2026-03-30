@@ -10,6 +10,8 @@ import '../core/services/recipe_service.dart';
 import '../core/services/vision_parsing_service.dart';
 import '../core/services/vision_service.dart';
 import '../domain/models/models.dart';
+import '../features/cook_mode/domain/cook_mode_services.dart';
+import '../features/cook_mode/infrastructure/mock/mock_cook_mode_services.dart';
 import '../infrastructure/mock/mock_repositories.dart';
 import '../infrastructure/mock/mock_services.dart';
 import '../infrastructure/mock/mock_vision_parsing_service.dart';
@@ -35,6 +37,23 @@ final recipeServiceProvider = Provider<RecipeSuggestionService>((ref) {
   if (config.useMocks) return MockRecipeSuggestionService();
   return MockRecipeSuggestionService();
 });
+
+
+final _speechCommandBusProvider = Provider<InMemorySpeechCommandBus>((ref) {
+  final bus = InMemorySpeechCommandBus();
+  ref.onDispose(bus.dispose);
+  return bus;
+});
+
+final textToSpeechServiceProvider = Provider<TextToSpeechService>((ref) => MockTextToSpeechService());
+
+final speechCommandServiceProvider = Provider<SpeechCommandService>((ref) => ref.watch(_speechCommandBusProvider));
+
+final mockSpeechCommandEmitterProvider = Provider<MockSpeechCommandEmitter>((
+  ref,
+) => ref.watch(_speechCommandBusProvider));
+
+final keepScreenAwakeServiceProvider = Provider<KeepScreenAwakeService>((ref) => MockKeepScreenAwakeService());
 
 final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
   final config = ref.watch(appConfigProvider);
