@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/app_navigation.dart';
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
+import '../../../core/services/analytics_service.dart';
 import '../../../core/widgets/app_scaffold.dart';
 
 class RecipeDetailScreen extends ConsumerStatefulWidget {
@@ -38,11 +39,15 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
     }
     if (!_trackedOpen) {
       _trackedOpen = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(favoritesHistoryControllerProvider.notifier).trackEvent(
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await ref.read(favoritesHistoryControllerProvider.notifier).trackEvent(
               type: HistoryEventType.viewedRecipe,
               recipe: recipe,
             );
+        await ref.read(analyticsServiceProvider).logEvent(
+          AppAnalyticsEvent.recipeOpened,
+          parameters: {'recipeId': recipe.id, 'matchType': recipe.matchType.name},
+        );
       });
     }
     final historyState = ref.watch(favoritesHistoryControllerProvider);
@@ -98,6 +103,10 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
               OutlinedButton.icon(
                 onPressed: () {
                   ref.read(shoppingListControllerProvider.notifier).createFromRecipe(recipe);
+                  ref.read(analyticsServiceProvider).logEvent(
+                    AppAnalyticsEvent.shoppingHandoffStarted,
+                    parameters: {'recipeId': recipe.id, 'missingIngredients': recipe.missingIngredients.length},
+                  );
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added missing ingredients to shopping list.')));
                   context.pushShoppingList();
                 },
@@ -110,6 +119,10 @@ class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
                         type: HistoryEventType.startedCookMode,
                         recipe: recipe,
                       );
+                  await ref.read(analyticsServiceProvider).logEvent(
+                    AppAnalyticsEvent.cookModeStarted,
+                    parameters: {'recipeId': recipe.id},
+                  );
                   if (context.mounted) {
                     context.pushCookMode(recipe);
                   }

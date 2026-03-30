@@ -60,6 +60,9 @@ class UserPreferences {
     this.lowSodium = false,
     this.lowSugar = false,
     this.lowerCalorie = false,
+    this.showMockControlsInDebug = true,
+    this.analyticsConsentPlaceholder = true,
+    this.aiVoiceDisclosureAcknowledged = false,
   });
 
   final List<MealType> preferredMealTypes;
@@ -73,6 +76,9 @@ class UserPreferences {
   final bool lowSodium;
   final bool lowSugar;
   final bool lowerCalorie;
+  final bool showMockControlsInDebug;
+  final bool analyticsConsentPlaceholder;
+  final bool aiVoiceDisclosureAcknowledged;
 
   UserPreferences copyWith({
     List<MealType>? preferredMealTypes,
@@ -86,6 +92,9 @@ class UserPreferences {
     bool? lowSodium,
     bool? lowSugar,
     bool? lowerCalorie,
+    bool? showMockControlsInDebug,
+    bool? analyticsConsentPlaceholder,
+    bool? aiVoiceDisclosureAcknowledged,
   }) {
     return UserPreferences(
       preferredMealTypes: preferredMealTypes ?? this.preferredMealTypes,
@@ -99,6 +108,9 @@ class UserPreferences {
       lowSodium: lowSodium ?? this.lowSodium,
       lowSugar: lowSugar ?? this.lowSugar,
       lowerCalorie: lowerCalorie ?? this.lowerCalorie,
+      showMockControlsInDebug: showMockControlsInDebug ?? this.showMockControlsInDebug,
+      analyticsConsentPlaceholder: analyticsConsentPlaceholder ?? this.analyticsConsentPlaceholder,
+      aiVoiceDisclosureAcknowledged: aiVoiceDisclosureAcknowledged ?? this.aiVoiceDisclosureAcknowledged,
     );
   }
 
@@ -114,6 +126,9 @@ class UserPreferences {
         'lowSodium': lowSodium,
         'lowSugar': lowSugar,
         'lowerCalorie': lowerCalorie,
+        'showMockControlsInDebug': showMockControlsInDebug,
+        'analyticsConsentPlaceholder': analyticsConsentPlaceholder,
+        'aiVoiceDisclosureAcknowledged': aiVoiceDisclosureAcknowledged,
       };
 
   factory UserPreferences.fromJson(Map<String, dynamic> json) {
@@ -143,6 +158,9 @@ class UserPreferences {
       lowSodium: json['lowSodium'] as bool? ?? false,
       lowSugar: json['lowSugar'] as bool? ?? false,
       lowerCalorie: json['lowerCalorie'] as bool? ?? false,
+      showMockControlsInDebug: json['showMockControlsInDebug'] as bool? ?? true,
+      analyticsConsentPlaceholder: json['analyticsConsentPlaceholder'] as bool? ?? true,
+      aiVoiceDisclosureAcknowledged: json['aiVoiceDisclosureAcknowledged'] as bool? ?? false,
     );
   }
 }

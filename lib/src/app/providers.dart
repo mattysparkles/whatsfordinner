@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../core/config/app_config.dart';
+import '../core/config/feature_flags.dart';
 import '../core/models/app_models.dart' as core;
 import '../core/repositories/favorites_repository.dart';
 import '../core/repositories/pantry_repository.dart';
@@ -12,7 +14,10 @@ import '../core/services/recipe_service.dart';
 import '../core/services/vision_parsing_service.dart';
 import '../core/services/vision_service.dart';
 import '../core/services/pantry_intelligence_service.dart';
+import '../core/services/analytics_service.dart';
+import '../core/services/crash_reporting_service.dart';
 import '../core/services/local_persistence_service.dart';
+import '../core/services/user_error_messaging_service.dart';
 import '../domain/models/models.dart';
 import '../features/capture/application/capture_import_service.dart';
 import '../features/cook_mode/domain/cook_mode_services.dart';
@@ -43,6 +48,22 @@ import 'app_router.dart';
 
 export 'app_router.dart';
 
+final appFeatureFlagsProvider = Provider<FeatureFlags>((ref) {
+  final config = ref.watch(appConfigProvider);
+  return FeatureFlags(
+    useProductionAiServices: config.featureUseProductionAiServices,
+    enableInstacartProvider: config.featureEnableInstacartProvider,
+    enableAmazonProvider: config.featureEnableAmazonProvider,
+    enableWebFallbackProvider: config.featureEnableWebFallbackProvider,
+    enableAds: config.featureEnableAds,
+    enablePremiumFeatures: config.featureEnablePremiumFeatures,
+  );
+});
+
+final analyticsServiceProvider = Provider<AnalyticsService>((_) => const DebugAnalyticsService());
+final crashReportingServiceProvider = Provider<CrashReportingService>((_) => const DebugCrashReportingService());
+final userErrorMessagingServiceProvider = Provider<UserErrorMessagingService>((_) => const UserErrorMessagingService());
+
 final visionServiceProvider = Provider<VisionService>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return MockVisionService();
@@ -55,13 +76,15 @@ final pantryIntelligenceServiceProvider = Provider<PantryIntelligenceService>((r
 
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);
-  if (config.useMocks) return MockVisionParsingService();
+  final flags = ref.watch(appFeatureFlagsProvider);
+  if (config.useMocks || !flags.useProductionAiServices) return MockVisionParsingService();
   return OpenAiVisionParsingService(config: config);
 });
 
 final recipeServiceProvider = Provider<RecipeSuggestionService>((ref) {
   final config = ref.watch(appConfigProvider);
-  if (config.useMocks) return MockRecipeSuggestionService();
+  final flags = ref.watch(appFeatureFlagsProvider);
+  if (config.useMocks || !flags.useProductionAiServices) return MockRecipeSuggestionService();
   return OpenAiRecipeSuggestionService(config: config);
 });
 
@@ -112,6 +135,7 @@ final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
 });
 
 final selectedRecipeProvider = StateProvider<core.RecipeSuggestion?>((_) => null);
+final isDebugModeProvider = Provider<bool>((_) => kDebugMode);
 
 class PreferencesController extends StateNotifier<AsyncValue<core.UserPreferences>> {
   PreferencesController(this._repo) : super(const AsyncLoading()) {
@@ -614,6 +638,9 @@ final recipeSuggestionsProvider = FutureProvider<List<core.RecipeSuggestion>>((r
     lowSodium: stored.lowSodium,
     lowSugar: stored.lowSugar,
     lowerCalorie: stored.lowerCalorie,
+    showMockControlsInDebug: stored.showMockControlsInDebug,
+    analyticsConsentPlaceholder: stored.analyticsConsentPlaceholder,
+    aiVoiceDisclosureAcknowledged: stored.aiVoiceDisclosureAcknowledged,
   );
   final service = ref.watch(recipeServiceProvider);
   final mappedItems = pantryItems
@@ -637,6 +664,14 @@ final recipeSuggestionsProvider = FutureProvider<List<core.RecipeSuggestion>>((r
   for (final idea in suggestions.where((item) => item.isPantryFreestyle)) {
     await historyController.trackEvent(type: core.HistoryEventType.generatedFreestyleIdea, recipe: idea);
   }
+  await ref.read(analyticsServiceProvider).logEvent(
+    AppAnalyticsEvent.recipeSuggestionsGenerated,
+    parameters: {
+      'total': suggestions.length,
+      'pantryFreestyleCount': suggestions.where((item) => item.isPantryFreestyle).length,
+      'mealType': discovery.mealType.name,
+    },
+  );
   return _sortSuggestions(suggestions, discovery.sortOption);
 });
 
@@ -656,37 +691,41 @@ List<core.RecipeSuggestion> _sortSuggestions(List<core.RecipeSuggestion> suggest
 }
 
 final shoppingLinkServiceProvider = Provider<ShoppingLinkService>((ref) {
-  return ShoppingLinkServiceImpl(
-    adapters: [
-      InstacartLinkAdapter(),
-      AmazonLinkAdapter(),
-      WebFallbackAdapter(),
-    ],
-  );
+  final flags = ref.watch(appFeatureFlagsProvider);
+  final adapters = <ShoppingProviderAdapter>[
+    if (flags.enableInstacartProvider) InstacartLinkAdapter(),
+    if (flags.enableAmazonProvider) AmazonLinkAdapter(),
+    if (flags.enableWebFallbackProvider) WebFallbackAdapter(),
+  ];
+  return ShoppingLinkServiceImpl(adapters: adapters);
 });
 
 final shoppingProvidersProvider = Provider<List<core.CommerceProvider>>((ref) {
-  return const [
-    core.CommerceProvider(
-      id: 'instacart',
-      name: 'Instacart',
-      capabilityLabel: core.ProviderCapabilityLabel.active,
-      supportsAffiliateTracking: true,
-      notes: 'Open in Instacart with prefilled list context.',
-    ),
-    core.CommerceProvider(
-      id: 'amazon',
-      name: 'Amazon',
-      capabilityLabel: core.ProviderCapabilityLabel.configuredButUnavailable,
-      supportsAffiliateTracking: true,
-      notes: 'Configured fallback for item-by-item product searches.',
-    ),
-    core.CommerceProvider(
-      id: 'web-fallback',
-      name: 'Web Search',
-      capabilityLabel: core.ProviderCapabilityLabel.comingLater,
-      notes: 'Generic fallback adapter intentionally marked as coming later.',
-    ),
+  final flags = ref.watch(appFeatureFlagsProvider);
+  return [
+    if (flags.enableInstacartProvider)
+      const core.CommerceProvider(
+        id: 'instacart',
+        name: 'Instacart',
+        capabilityLabel: core.ProviderCapabilityLabel.active,
+        supportsAffiliateTracking: true,
+        notes: 'Open in Instacart with prefilled list context.',
+      ),
+    if (flags.enableAmazonProvider)
+      const core.CommerceProvider(
+        id: 'amazon',
+        name: 'Amazon',
+        capabilityLabel: core.ProviderCapabilityLabel.configuredButUnavailable,
+        supportsAffiliateTracking: true,
+        notes: 'Configured fallback for item-by-item product searches.',
+      ),
+    if (flags.enableWebFallbackProvider)
+      const core.CommerceProvider(
+        id: 'web-fallback',
+        name: 'Web Search',
+        capabilityLabel: core.ProviderCapabilityLabel.comingLater,
+        notes: 'Generic fallback adapter intentionally marked as coming later.',
+      ),
   ];
 });
 
@@ -701,7 +740,8 @@ final shoppingLinkLaunchStateProvider = StateProvider<(bool, String)?>((
 
 final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
   final config = ref.watch(appConfigProvider);
-  if (!config.useMocks) {
+  final flags = ref.watch(appFeatureFlagsProvider);
+  if (!flags.enablePremiumFeatures || !config.useMocks) {
     throw UnsupportedError('SubscriptionService is mock-only right now. Set USE_MOCKS=true.');
   }
   final service = MockSubscriptionService();
@@ -711,6 +751,8 @@ final subscriptionServiceProvider = Provider<SubscriptionService>((ref) {
 
 final adServiceProvider = Provider<AdService>((ref) {
   final config = ref.watch(appConfigProvider);
+  final flags = ref.watch(appFeatureFlagsProvider);
+  if (!flags.enableAds) return const NoOpAdService();
   if (config.useMocks) return const MockAdService();
   throw UnsupportedError('AdService is mock-only right now. Set USE_MOCKS=true.');
 });
@@ -755,13 +797,18 @@ class MonetizationPolicy {
     required this.subscription,
     required this.entitlements,
     required this.adService,
+    required this.featureFlags,
   });
 
   final SubscriptionState subscription;
   final EntitlementSet entitlements;
   final AdService adService;
+  final FeatureFlags featureFlags;
 
-  bool hasFeature(PremiumFeature feature) => entitlements.has(feature);
+  bool hasFeature(PremiumFeature feature) {
+    if (!featureFlags.enablePremiumFeatures) return false;
+    return entitlements.has(feature);
+  }
 
   bool shouldShowAd(AdPlacement placement) {
     return adService.canRenderPlacement(placement: placement, subscription: subscription);
@@ -772,5 +819,6 @@ final monetizationPolicyProvider = Provider<MonetizationPolicy>((ref) {
   final subscription = ref.watch(subscriptionControllerProvider);
   final entitlements = const EntitlementPolicy().resolve(subscription);
   final adService = ref.watch(adServiceProvider);
-  return MonetizationPolicy(subscription: subscription, entitlements: entitlements, adService: adService);
+  final featureFlags = ref.watch(appFeatureFlagsProvider);
+  return MonetizationPolicy(subscription: subscription, entitlements: entitlements, adService: adService, featureFlags: featureFlags);
 });

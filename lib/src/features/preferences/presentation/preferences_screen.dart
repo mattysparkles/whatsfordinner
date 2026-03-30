@@ -134,6 +134,36 @@ class PreferencesScreen extends ConsumerWidget {
                 ],
               ),
             ),
+
+            _SectionCard(
+              title: 'App controls',
+              child: Column(
+                children: [
+                  if (ref.watch(isDebugModeProvider))
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      value: preferences.showMockControlsInDebug,
+                      title: const Text('Show mock-mode controls (debug only)'),
+                      subtitle: const Text('Keeps demo and QA toggles visible while testing.'),
+                      onChanged: (value) => _save(ref, preferences.copyWith(showMockControlsInDebug: value)),
+                    ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: preferences.analyticsConsentPlaceholder,
+                    title: const Text('Analytics consent placeholder'),
+                    subtitle: const Text('Temporary toggle until full consent flow ships.'),
+                    onChanged: (value) => _save(ref, preferences.copyWith(analyticsConsentPlaceholder: value)),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: preferences.aiVoiceDisclosureAcknowledged,
+                    title: const Text('AI voice disclosure acknowledged'),
+                    subtitle: const Text('Confirm you understand voice guidance may be AI generated.'),
+                    onChanged: (value) => _save(ref, preferences.copyWith(aiVoiceDisclosureAcknowledged: value)),
+                  ),
+                ],
+              ),
+            ),
             const LockedFeatureTile(
               feature: PremiumFeature.advancedHouseholdProfiles,
               title: 'Advanced household profiles',

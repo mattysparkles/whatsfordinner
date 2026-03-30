@@ -19,6 +19,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final discovery = ref.watch(recipeDiscoveryProvider);
+    final pantryItems = ref.watch(pantryControllerProvider).items;
 
     return AppScaffold(
       title: 'PantryPilot',
@@ -32,6 +33,25 @@ class HomeScreen extends ConsumerWidget {
       body: ListView(
         children: [
           const Text('What are we making?', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          if (pantryItems.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Start here: add ingredients to unlock better suggestions.'),
+                    const SizedBox(height: 8),
+                    OutlinedButton.icon(
+                      onPressed: () => context.push(AppRoutes.capture),
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('Scan pantry items'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 12),
           Wrap(
             spacing: 8,
