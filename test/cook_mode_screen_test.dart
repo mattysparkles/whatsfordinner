@@ -75,4 +75,17 @@ void main() {
 
     expect(find.text('Ingredient checklist (1/2)'), findsOneWidget);
   });
+
+  testWidgets('cook mode voice pause control toggles state label', (tester) async {
+    final router = buildRouter();
+
+    await tester.pumpWidget(ProviderScope(child: MaterialApp.router(routerConfig: router)));
+    router.go('/cook', extra: testRecipe());
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pause voice'), findsOneWidget);
+    await tester.tap(find.text('Pause voice'));
+    await tester.pumpAndSettle();
+    expect(find.text('Resume voice'), findsOneWidget);
+  });
 }

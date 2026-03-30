@@ -8,7 +8,10 @@ import '../features/home/presentation/home_screen.dart';
 import '../features/monetization/presentation/monetization_screen.dart';
 import '../features/onboarding/presentation/onboarding_screen.dart';
 import '../features/pantry/presentation/pantry_screen.dart';
+import '../features/preferences/presentation/about_screen.dart';
 import '../features/preferences/presentation/preferences_screen.dart';
+import '../features/preferences/presentation/privacy_screen.dart';
+import '../features/preferences/presentation/terms_screen.dart';
 import '../features/recipes/presentation/recipe_detail_screen.dart';
 import '../features/recipes/presentation/recipes_screen.dart';
 import '../features/shopping_list/presentation/shopping_list_screen.dart';
@@ -27,6 +30,9 @@ final appRouterProvider = Provider<GoRouter>(
       GoRoute(path: AppRoutes.cookMode, builder: (_, _) => const CookModeScreen()),
       GoRoute(path: AppRoutes.shoppingList, builder: (_, _) => const ShoppingListScreen()),
       GoRoute(path: AppRoutes.preferences, builder: (_, _) => const PreferencesScreen()),
+      GoRoute(path: AppRoutes.about, builder: (_, _) => const AboutScreen()),
+      GoRoute(path: AppRoutes.privacy, builder: (_, _) => const PrivacyScreen()),
+      GoRoute(path: AppRoutes.terms, builder: (_, _) => const TermsScreen()),
       GoRoute(path: AppRoutes.favoritesHistory, builder: (_, _) => const FavoritesHistoryScreen()),
       GoRoute(path: AppRoutes.monetization, builder: (_, _) => const MonetizationScreen()),
     ],

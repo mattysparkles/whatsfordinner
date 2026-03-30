@@ -22,11 +22,32 @@ class PantryScreen extends ConsumerWidget {
         label: const Text('Add item'),
       ),
       body: pantryState.isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 12),
+                  Text('Loading pantry items...'),
+                ],
+              ),
+            )
           : Padding(
               padding: const EdgeInsets.all(12),
               child: Column(
                 children: [
+                  if (pantryState.errorMessage != null)
+                    Card(
+                      color: Theme.of(context).colorScheme.errorContainer,
+                      child: ListTile(
+                        leading: const Icon(Icons.error_outline),
+                        title: Text(pantryState.errorMessage!),
+                        trailing: TextButton(
+                          onPressed: controller.clearError,
+                          child: const Text('Dismiss'),
+                        ),
+                      ),
+                    ),
                   TextField(
                     onChanged: controller.setSearchQuery,
                     decoration: const InputDecoration(

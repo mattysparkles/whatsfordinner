@@ -1,26 +1,59 @@
-# PantryPilot Architecture (Scaffold)
+# PantryPilot architecture overview
 
-## Principles
-- **Feature-first UI**: each feature owns its presentation entry points.
-- **Clean boundaries**: `core` defines contracts and models; `infrastructure` provides implementations.
-- **Swap-friendly dependencies**: Riverpod providers map interfaces to mock or real adapters.
-- **Small files**: avoid monolithic files and centralize shared concerns in `core`.
+## Goals
+- Keep the app always runnable for demos.
+- Make production replacement of mocks straightforward.
+- Keep responsibilities obvious for new contributors.
 
-## Layers
-1. **App layer (`lib/src/app`)**
-   - Router (`GoRouter`) and dependency graph (`Riverpod`).
-2. **Core layer (`lib/src/core`)**
-   - Typed models, repository/service contracts, theme tokens/system, config.
-3. **Infrastructure layer (`lib/src/infrastructure`)**
-   - Mock services + in-memory repositories for local development.
-   - Persistence adapter scaffold for Hive-backed storage.
-4. **Feature layer (`lib/src/features`)**
-   - Placeholder screens per product area with TODO markers for future integrations.
+## Layering
 
-## Environment Strategy
-- Runtime behavior controlled via Dart defines and `EnvConfig`.
-- `USE_MOCKS=true` keeps local development deterministic.
-- API keys and base URLs are configured but not yet consumed by live adapters.
+### 1) App layer (`lib/src/app`)
+- App bootstrap and global dependency graph.
+- Route mapping and navigation entry points.
 
-## Why this scaffold
-This structure keeps onboarding and navigation immediately runnable while preserving clean seams for future API, persistence, monetization, and cook-mode integrations without large refactors.
+### 2) Core layer (`lib/src/core`)
+- Config parsing from Dart defines.
+- Shared models and contracts for repositories/services.
+- Reusable widgets and theme tokens.
+
+### 3) Domain layer (`lib/src/domain`)
+- Product-focused domain entities that cross features.
+- Domain interfaces for business-oriented operations.
+
+### 4) Infrastructure layer (`lib/src/infrastructure`)
+- Mock implementations used for deterministic local development.
+- Local persistence adapter scaffolding.
+
+### 5) Feature layer (`lib/src/features`)
+- Presentation and feature-specific state controllers.
+- UI state transitions and screen composition.
+
+## Data and dependency direction
+
+```text
+features -> domain/core contracts -> infrastructure implementations
+```
+
+- UI should depend on contracts, not concrete services.
+- Riverpod providers decide whether mock vs real adapters are injected.
+
+## State management strategy
+- Riverpod `Provider` for stateless dependencies.
+- Riverpod `StateNotifierProvider` for mutable feature states.
+- `FutureProvider` for async recipe suggestion fetching.
+
+## Error/loading strategy
+- Async flows surface loading indicators and retry actions.
+- Recoverable failures are shown in-screen with actionable messaging.
+- Feature controllers keep lightweight error state where practical.
+
+## Testing strategy
+- Unit tests for controller/domain behavior.
+- Widget tests for key state transitions and feature UX interactions.
+- CI enforces analyze + format + tests on every PR.
+
+## Contributor onboarding checklist
+1. Read `README.md` + this file.
+2. Run `flutter pub get` then `flutter test`.
+3. Use mock mode (`USE_MOCKS=true`) for deterministic demos.
+4. Add/adjust tests with every behavior change.

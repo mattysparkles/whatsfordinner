@@ -8,6 +8,9 @@ abstract final class AppRoutes {
   static const cookMode = '/cook-mode';
   static const shoppingList = '/shopping-list';
   static const preferences = '/preferences';
+  static const about = '/about';
+  static const privacy = '/privacy';
+  static const terms = '/terms';
   static const favoritesHistory = '/favorites-history';
   static const monetization = '/monetization';
 }
