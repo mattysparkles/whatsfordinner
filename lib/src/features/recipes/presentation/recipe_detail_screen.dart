@@ -1,25 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../app/app_routes.dart';
+import '../../../app/app_navigation.dart';
 import '../../../app/providers.dart';
 import '../../../core/models/app_models.dart';
 import '../../../core/widgets/app_scaffold.dart';
 
-class RecipeDetailScreen extends ConsumerWidget {
-  const RecipeDetailScreen({super.key});
+class RecipeDetailScreen extends ConsumerStatefulWidget {
+  const RecipeDetailScreen({super.key, this.seedRecipe});
+
+  final RecipeSuggestion? seedRecipe;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final recipe = GoRouterState.of(context).extra as RecipeSuggestion?;
+  ConsumerState<RecipeDetailScreen> createState() => _RecipeDetailScreenState();
+}
+
+class _RecipeDetailScreenState extends ConsumerState<RecipeDetailScreen> {
+  @override
+  void initState() {
+    super.initState();
+    final seedRecipe = widget.seedRecipe;
+    if (seedRecipe != null) {
+      ref.read(selectedRecipeProvider.notifier).state = seedRecipe;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final recipe = widget.seedRecipe ?? ref.watch(selectedRecipeProvider);
     if (recipe == null) {
       return const AppScaffold(
         title: 'Recipe detail',
         body: Center(child: Text('No recipe selected.')),
       );
     }
-
     return AppScaffold(
       title: recipe.title,
       body: ListView(
@@ -70,13 +84,13 @@ class RecipeDetailScreen extends ConsumerWidget {
                 onPressed: () {
                   ref.read(shoppingListControllerProvider.notifier).createFromRecipe(recipe);
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Added missing ingredients to shopping list.')));
-                  context.push(AppRoutes.shoppingList);
+                  context.pushShoppingList();
                 },
                 icon: const Icon(Icons.add_shopping_cart),
                 label: const Text('Add missing to shopping list'),
               ),
               FilledButton.icon(
-                onPressed: () => context.push(AppRoutes.cookMode),
+                onPressed: () => context.pushCookMode(recipe),
                 icon: const Icon(Icons.play_arrow),
                 label: const Text('Start cook mode'),
               ),

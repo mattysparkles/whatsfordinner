@@ -2,35 +2,38 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pantry_pilot/src/app/app_navigation.dart';
 import 'package:pantry_pilot/src/features/cook_mode/presentation/cook_mode_screen.dart';
-
-import 'package:pantry_pilot/src/domain/models/models.dart';
+import 'package:pantry_pilot/src/core/models/app_models.dart';
 
 void main() {
   RecipeSuggestion testRecipe() {
     return const RecipeSuggestion(
       id: 'r1',
       title: 'Test Soup',
-      description: 'Simple soup for testing.',
+      shortDescription: 'Simple soup for testing.',
       matchType: RecipeMatchType.exact,
-      confidence: 0.9,
-      whySuggested: 'Test reasons',
-      mealType: MealType.dinner,
       prepMinutes: 5,
       cookMinutes: 10,
+      difficulty: 1,
+      familyFriendlyScore: 3,
+      healthScore: 3,
+      fancyScore: 1,
       servings: 2,
+      dietaryTags: const [],
       requirements: [
-        RecipeIngredientRequirement(name: 'Onion', quantity: 1, unit: 'count'),
-        RecipeIngredientRequirement(name: 'Broth', quantity: 2, unit: 'cups'),
+        RecipeIngredientRequirement(ingredientName: 'Onion', requiredAmount: 1, unit: 'count', isAvailable: true),
+        RecipeIngredientRequirement(ingredientName: 'Broth', requiredAmount: 2, unit: 'cups', isAvailable: false),
       ],
       availableIngredients: ['Onion'],
       missingIngredients: [],
-      substitutions: {},
       steps: [
         CookingStep(order: 1, instruction: 'Chop the onion.'),
         CookingStep(order: 2, instruction: 'Simmer with broth.'),
         CookingStep(order: 3, instruction: 'Serve warm.'),
       ],
+      suggestedPairings: const [],
+      explanation: RecipeExplanation(summary: 'Test reasons', pantryHighlights: []),
     );
   }
 
@@ -48,7 +51,7 @@ void main() {
     final router = buildRouter();
 
     await tester.pumpWidget(ProviderScope(child: MaterialApp.router(routerConfig: router)));
-    router.go('/cook', extra: testRecipe());
+    router.go('/cook', extra: CookModeRouteExtra(recipe: testRecipe()));
     await tester.pumpAndSettle();
 
     expect(find.text('Step 1 of 3'), findsOneWidget);
@@ -70,7 +73,7 @@ void main() {
     final router = buildRouter();
 
     await tester.pumpWidget(ProviderScope(child: MaterialApp.router(routerConfig: router)));
-    router.go('/cook', extra: testRecipe());
+    router.go('/cook', extra: CookModeRouteExtra(recipe: testRecipe()));
     await tester.pumpAndSettle();
 
     expect(find.text('Ingredient checklist (1/2)'), findsOneWidget);
@@ -80,7 +83,7 @@ void main() {
     final router = buildRouter();
 
     await tester.pumpWidget(ProviderScope(child: MaterialApp.router(routerConfig: router)));
-    router.go('/cook', extra: testRecipe());
+    router.go('/cook', extra: CookModeRouteExtra(recipe: testRecipe()));
     await tester.pumpAndSettle();
 
     expect(find.text('Pause voice'), findsOneWidget);

@@ -2,14 +2,15 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
-import '../../../domain/models/models.dart';
+import '../../../core/models/app_models.dart';
 import '../domain/cook_mode_services.dart';
 
 class CookModeScreen extends ConsumerStatefulWidget {
-  const CookModeScreen({super.key});
+  const CookModeScreen({super.key, this.seedRecipe});
+
+  final RecipeSuggestion? seedRecipe;
 
   @override
   ConsumerState<CookModeScreen> createState() => _CookModeScreenState();
@@ -28,6 +29,10 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
   @override
   void initState() {
     super.initState();
+    final seedRecipe = widget.seedRecipe;
+    if (seedRecipe != null) {
+      ref.read(selectedRecipeProvider.notifier).state = seedRecipe;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(keepScreenAwakeServiceProvider).enable();
       _commandSub = ref.read(speechCommandServiceProvider).commandStream().listen(_handleVoiceCommand);
@@ -44,7 +49,7 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final recipe = GoRouterState.of(context).extra as RecipeSuggestion?;
+    final recipe = widget.seedRecipe ?? ref.watch(selectedRecipeProvider);
     final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
     final current = steps[_index.clamp(0, steps.length - 1)];
 
@@ -236,7 +241,7 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
 
   Future<void> _startTimerFor(CookingStep step) async {
     _timer?.cancel();
-    setState(() => _timerRemaining = step.timerSeconds ?? 300);
+    setState(() => _timerRemaining = ((step.estimatedMinutes ?? 5) * 60));
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
       if (_timerRemaining <= 1) {
@@ -263,7 +268,7 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
         await ref.read(textToSpeechServiceProvider).speak(_currentInstruction());
         break;
       case VoiceCommand.startTimer:
-        final recipe = GoRouterState.of(context).extra as RecipeSuggestion?;
+        final recipe = widget.seedRecipe ?? ref.read(selectedRecipeProvider);
         final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
         await _startTimerFor(steps[_index]);
         break;
@@ -274,12 +279,12 @@ class _CookModeScreenState extends ConsumerState<CookModeScreen> {
   }
 
   int _stepCount() {
-    final recipe = GoRouterState.of(context).extra as RecipeSuggestion?;
+    final recipe = widget.seedRecipe ?? ref.read(selectedRecipeProvider);
     return recipe?.steps.length ?? 1;
   }
 
   String _currentInstruction() {
-    final recipe = GoRouterState.of(context).extra as RecipeSuggestion?;
+    final recipe = widget.seedRecipe ?? ref.read(selectedRecipeProvider);
     final steps = recipe?.steps ?? const [CookingStep(order: 1, instruction: 'Choose a recipe to start cook mode.')];
     return steps[_index].instruction;
   }
@@ -322,9 +327,9 @@ class _IngredientChecklistSummaryState extends State<_IngredientChecklistSummary
             : requirements
                 .map(
                   (requirement) => CheckboxListTile(
-                    value: available.contains(requirement.name),
+                    value: available.contains(requirement.ingredientName),
                     onChanged: null,
-                    title: Text(requirement.name),
+                    title: Text(requirement.ingredientName),
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
                 )

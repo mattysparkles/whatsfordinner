@@ -15,6 +15,7 @@ import '../features/preferences/presentation/terms_screen.dart';
 import '../features/recipes/presentation/recipe_detail_screen.dart';
 import '../features/recipes/presentation/recipes_screen.dart';
 import '../features/shopping_list/presentation/shopping_list_screen.dart';
+import 'app_navigation.dart';
 import 'app_routes.dart';
 
 final appRouterProvider = Provider<GoRouter>(
@@ -26,8 +27,29 @@ final appRouterProvider = Provider<GoRouter>(
       GoRoute(path: AppRoutes.capture, builder: (_, _) => const CaptureScreen()),
       GoRoute(path: AppRoutes.pantry, builder: (_, _) => const PantryScreen()),
       GoRoute(path: AppRoutes.recipes, builder: (_, _) => const RecipesScreen()),
-      GoRoute(path: AppRoutes.recipeDetail, builder: (_, _) => const RecipeDetailScreen()),
-      GoRoute(path: AppRoutes.cookMode, builder: (_, _) => const CookModeScreen()),
+      GoRoute(
+        path: AppRoutes.recipeDetail,
+        builder: (_, state) {
+          final extra = state.extra;
+          final seedRecipe = switch (extra) {
+            RecipeDetailRouteExtra(:final recipe) => recipe,
+            _ => null,
+          };
+          return RecipeDetailScreen(seedRecipe: seedRecipe);
+        },
+      ),
+      GoRoute(
+        path: AppRoutes.cookMode,
+        builder: (_, state) {
+          final extra = state.extra;
+          final seedRecipe = switch (extra) {
+            CookModeRouteExtra(:final recipe) => recipe,
+            RecipeDetailRouteExtra(:final recipe) => recipe,
+            _ => null,
+          };
+          return CookModeScreen(seedRecipe: seedRecipe);
+        },
+      ),
       GoRoute(path: AppRoutes.shoppingList, builder: (_, _) => const ShoppingListScreen()),
       GoRoute(path: AppRoutes.preferences, builder: (_, _) => const PreferencesScreen()),
       GoRoute(path: AppRoutes.about, builder: (_, _) => const AboutScreen()),

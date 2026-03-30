@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../app/app_routes.dart';
 import '../../../app/providers.dart';
 import '../../../domain/models/models.dart';
-import '../../../shared/widgets/primary_scaffold.dart';
+import '../../../core/widgets/app_scaffold.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({super.key});
@@ -21,7 +23,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PrimaryScaffold(
+    return AppScaffold(
       title: 'Capture Ingredients',
       body: ListView(
         children: [
@@ -173,7 +175,7 @@ class _ParseReviewScreenState extends State<ParseReviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PrimaryScaffold(
+    return AppScaffold(
       title: 'Review ingredients',
       actions: [
         IconButton(
@@ -237,6 +239,7 @@ class _ParseReviewScreenState extends State<ParseReviewScreen> {
     if (!mounted) return;
     setState(() => _isSaving = false);
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Approved items added to inventory.')));
+    context.go(AppRoutes.pantry);
   }
 
   void _mergeDuplicates() {
