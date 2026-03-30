@@ -50,6 +50,7 @@ void main() {
         config: const EnvConfig(
           environment: AppEnvironment.dev,
           useMocks: false,
+          gatewayApiBaseUrl: 'http://localhost:8000',
           recipeApiBaseUrl: 'https://api.openai.com/v1',
           visionApiBaseUrl: 'https://api.openai.com/v1',
           recipeApiKey: 'test-key',
@@ -90,6 +91,7 @@ void main() {
         config: const EnvConfig(
           environment: AppEnvironment.dev,
           useMocks: false,
+          gatewayApiBaseUrl: 'http://localhost:8000',
           recipeApiBaseUrl: 'https://api.openai.com/v1',
           visionApiBaseUrl: 'https://api.openai.com/v1',
           recipeApiKey: 'test-key',
