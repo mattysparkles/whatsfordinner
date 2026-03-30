@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -7,6 +9,8 @@ import 'package:uuid/uuid.dart';
 import '../core/config/app_config.dart';
 import '../core/config/feature_flags.dart';
 import '../core/models/app_models.dart' as core;
+import '../core/models/auth_models.dart';
+import '../core/repositories/auth_repository.dart';
 import '../core/repositories/favorites_repository.dart';
 import '../core/repositories/pantry_repository.dart';
 import '../core/repositories/preferences_repository.dart';
@@ -42,6 +46,11 @@ import '../infrastructure/gateway/gateway_recipe_suggestion_service.dart';
 import '../infrastructure/mock/mock_vision_parsing_service.dart';
 import '../infrastructure/gateway/gateway_vision_parsing_service.dart';
 import '../infrastructure/gateway/pantry_gateway_client.dart';
+import '../infrastructure/auth/firebase_auth_repository.dart';
+import '../infrastructure/auth/local_auth_repository.dart';
+import '../infrastructure/cloud/account_sync_migration_service.dart';
+import '../infrastructure/cloud/firestore_user_cloud_store.dart';
+import '../infrastructure/cloud/synced_repositories.dart';
 import '../infrastructure/persistence/hive_local_persistence.dart';
 import '../infrastructure/persistence/local_favorites_repository.dart';
 import '../infrastructure/persistence/local_pantry_repository.dart';
@@ -128,21 +137,126 @@ final keepScreenAwakeServiceProvider = Provider<KeepScreenAwakeService>((ref) {
   return DeviceKeepScreenAwakeService();
 });
 
-final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
+final localPantryRepositoryProvider = Provider<PantryRepository>((ref) {
   final config = ref.watch(appConfigProvider);
   if (config.useMocks) return InMemoryPantryRepository();
   return LocalPantryRepository();
 });
 final localPersistenceProvider = Provider<LocalPersistenceService>((ref) => HiveLocalPersistence.instance);
-final preferencesRepositoryProvider = Provider<PreferencesRepository>((ref) {
+final localPreferencesRepositoryProvider = Provider<PreferencesRepository>((ref) {
   return LocalPreferencesRepository(ref.watch(localPersistenceProvider));
 });
-final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
+final localFavoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
   return LocalFavoritesRepository(ref.watch(localPersistenceProvider));
+});
+
+final authRepositoryProvider = Provider<AuthRepository>((ref) {
+  try {
+    return FirebaseAuthRepository(FirebaseAuth.instance);
+  } catch (_) {
+    return LocalAuthRepository()..signInAnonymously();
+  }
+});
+
+final authStateProvider = StreamProvider<AuthUser?>((ref) => ref.watch(authRepositoryProvider).authStateChanges());
+final firestoreUserCloudStoreProvider = Provider<FirestoreUserCloudStore>((ref) {
+  final store = FirestoreUserCloudStore(FirebaseFirestore.instance);
+  final config = ref.watch(appConfigProvider);
+  unawaited(store.enableLocalCacheAndMaybeEmulator(useEmulator: config.useFirebaseEmulators));
+  return store;
+});
+
+final migrationServiceProvider = Provider<AccountSyncMigrationService>((ref) {
+  return AccountSyncMigrationService(
+    pantryRepository: ref.watch(localPantryRepositoryProvider),
+    preferencesRepository: ref.watch(localPreferencesRepositoryProvider),
+    favoritesRepository: ref.watch(localFavoritesRepositoryProvider),
+    cloudStore: ref.watch(firestoreUserCloudStoreProvider),
+  );
+});
+
+final pantryRepositoryProvider = Provider<PantryRepository>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  final local = ref.watch(localPantryRepositoryProvider);
+  if (user == null || user.isAnonymous) return local;
+  return SyncedPantryRepository(local: local, cloud: ref.watch(firestoreUserCloudStoreProvider), uid: user.uid);
+});
+final preferencesRepositoryProvider = Provider<PreferencesRepository>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  final local = ref.watch(localPreferencesRepositoryProvider);
+  if (user == null || user.isAnonymous) return local;
+  return SyncedPreferencesRepository(local: local, cloud: ref.watch(firestoreUserCloudStoreProvider), uid: user.uid);
+});
+final favoritesRepositoryProvider = Provider<FavoritesRepository>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  final local = ref.watch(localFavoritesRepositoryProvider);
+  if (user == null || user.isAnonymous) return local;
+  return SyncedFavoritesRepository(local: local, cloud: ref.watch(firestoreUserCloudStoreProvider), uid: user.uid);
 });
 
 final selectedRecipeProvider = StateProvider<core.RecipeSuggestion?>((_) => null);
 final isDebugModeProvider = Provider<bool>((_) => kDebugMode);
+
+class AccountController extends StateNotifier<AsyncValue<AuthUser?>> {
+  AccountController(this._ref) : super(const AsyncData(null)) {
+    _subscription = _ref.listenManual<AsyncValue<AuthUser?>>(
+      authStateProvider,
+      (_, next) => state = next,
+      fireImmediately: true,
+    );
+  }
+
+  final Ref _ref;
+  late final ProviderSubscription<AsyncValue<AuthUser?>> _subscription;
+
+  AuthRepository get _auth => _ref.read(authRepositoryProvider);
+
+  Future<void> signInGuest() async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() => _auth.signInAnonymously());
+  }
+
+  Future<void> signInWithEmail(String email, String password) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final user = await _auth.signInWithEmailPassword(email: email, password: password);
+      await _ref.read(migrationServiceProvider).migrateLocalDataToCloud(user.uid);
+      return user;
+    });
+  }
+
+  Future<void> signUp(String email, String password) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final user = await _auth.signUpWithEmailPassword(email: email, password: password);
+      await _ref.read(migrationServiceProvider).migrateLocalDataToCloud(user.uid);
+      return user;
+    });
+  }
+
+  Future<void> upgradeGuestAccount(String email, String password) async {
+    state = const AsyncLoading();
+    state = await AsyncValue.guard(() async {
+      final user = await _auth.upgradeAnonymousAccount(email: email, password: password);
+      await _ref.read(migrationServiceProvider).migrateLocalDataToCloud(user.uid);
+      return user;
+    });
+  }
+
+  Future<void> signOut() async {
+    await _auth.signOut();
+  }
+
+  @override
+  void dispose() {
+    _subscription.close();
+    super.dispose();
+  }
+}
+
+final accountControllerProvider = StateNotifierProvider<AccountController, AsyncValue<AuthUser?>>(
+  (ref) => AccountController(ref),
+);
 
 class PreferencesController extends StateNotifier<AsyncValue<core.UserPreferences>> {
   PreferencesController(this._repo) : super(const AsyncLoading()) {

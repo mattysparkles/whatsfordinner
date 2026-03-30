@@ -136,6 +136,10 @@ class PreferencesScreen extends ConsumerWidget {
             ),
 
             _SectionCard(
+              title: 'Account & sync',
+              child: _AccountSection(),
+            ),
+            _SectionCard(
               title: 'App controls',
               child: Column(
                 children: [
@@ -202,6 +206,96 @@ class PreferencesScreen extends ConsumerWidget {
     return ref.read(preferencesControllerProvider.notifier).save(preferences);
   }
 }
+
+class _AccountSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(accountControllerProvider);
+    final user = authState.valueOrNull;
+    final isGuest = user == null || user.isAnonymous;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          isGuest ? 'Guest mode (local only)' : 'Signed in as ${user.email ?? 'account user'}',
+        ),
+        const SizedBox(height: 8),
+        Text(
+          isGuest
+              ? 'Sign in to sync pantry, preferences, recipes, and history across devices.'
+              : 'Cloud sync is enabled and runs in the background.',
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            if (isGuest)
+              OutlinedButton(
+                onPressed: () => ref.read(accountControllerProvider.notifier).signInGuest(),
+                child: const Text('Continue as guest'),
+              ),
+            FilledButton(
+              onPressed: () => _showEmailAuthDialog(context, ref, isUpgrade: user?.isAnonymous == true),
+              child: Text(user?.isAnonymous == true ? 'Upgrade account' : 'Email sign in'),
+            ),
+            if (!isGuest)
+              TextButton(
+                onPressed: () => ref.read(accountControllerProvider.notifier).signOut(),
+                child: const Text('Sign out'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showEmailAuthDialog(BuildContext context, WidgetRef ref, {required bool isUpgrade}) async {
+    final emailController = TextEditingController();
+    final passwordController = TextEditingController();
+    final mode = await showDialog<_AuthDialogMode>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(isUpgrade ? 'Upgrade guest account' : 'Email account'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: emailController, decoration: const InputDecoration(labelText: 'Email')),
+            const SizedBox(height: 8),
+            TextField(
+              controller: passwordController,
+              decoration: const InputDecoration(labelText: 'Password'),
+              obscureText: true,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, _AuthDialogMode.signIn), child: const Text('Sign in')),
+          FilledButton(onPressed: () => Navigator.pop(context, _AuthDialogMode.signUp), child: const Text('Sign up')),
+        ],
+      ),
+    );
+    if (mode == null) return;
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+    if (email.isEmpty || password.isEmpty) return;
+
+    final controller = ref.read(accountControllerProvider.notifier);
+    if (isUpgrade) {
+      await controller.upgradeGuestAccount(email, password);
+      return;
+    }
+    if (mode == _AuthDialogMode.signUp) {
+      await controller.signUp(email, password);
+      return;
+    }
+    await controller.signInWithEmail(email, password);
+  }
+}
+
+enum _AuthDialogMode { signIn, signUp }
 
 class _SectionCard extends StatelessWidget {
   const _SectionCard({required this.title, required this.child});
