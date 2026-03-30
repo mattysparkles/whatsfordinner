@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pantry_pilot/src/app/providers.dart';
 import 'package:pantry_pilot/src/app/app_navigation.dart';
 import 'package:pantry_pilot/src/features/cook_mode/presentation/cook_mode_screen.dart';
 import 'package:pantry_pilot/src/core/models/app_models.dart';
+import 'package:pantry_pilot/src/features/cook_mode/infrastructure/mock/mock_cook_mode_services.dart';
 
 void main() {
   RecipeSuggestion testRecipe() {
@@ -90,5 +92,38 @@ void main() {
     await tester.tap(find.text('Pause voice'));
     await tester.pumpAndSettle();
     expect(find.text('Resume voice'), findsOneWidget);
+  });
+
+  testWidgets('voice chips trigger state transitions and auto narration on entry', (tester) async {
+    final router = buildRouter();
+    final tts = MockTextToSpeechService();
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [textToSpeechServiceProvider.overrideWithValue(tts)],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    router.go('/cook', extra: CookModeRouteExtra(recipe: testRecipe()));
+    await tester.pumpAndSettle();
+
+    expect(tts.lastSpoken, 'Chop the onion.');
+
+    await tester.tap(find.text('Next step'));
+    await tester.pumpAndSettle();
+    expect(find.text('Step 2 of 3'), findsOneWidget);
+    expect(tts.lastSpoken, 'Simmer with broth.');
+
+    await tester.tap(find.text('Repeat that'));
+    await tester.pumpAndSettle();
+    expect(tts.lastSpoken, 'Simmer with broth.');
+
+    await tester.tap(find.text('Pause voice'));
+    await tester.pumpAndSettle();
+    expect(find.text('Resume voice'), findsOneWidget);
+
+    await tester.tap(find.text('Resume voice').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Pause voice'), findsWidgets);
   });
 }
