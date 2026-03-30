@@ -103,6 +103,13 @@ Set these on the backend host (or local shell), never in Flutter mobile builds:
 - `PANTRY_GATEWAY_INSTACART_PARTNER_ID`
 - `PANTRY_GATEWAY_INSTACART_API_KEY`
 - `PANTRY_GATEWAY_RATE_LIMIT_PER_MINUTE`
+- `PANTRY_GATEWAY_USER_QUOTA_PER_HOUR`
+- `PANTRY_GATEWAY_DEVICE_QUOTA_PER_HOUR`
+- `PANTRY_GATEWAY_OPENAI_MAX_RETRIES`
+- `PANTRY_GATEWAY_OPENAI_RETRY_BACKOFF_SECONDS`
+- `PANTRY_GATEWAY_OPENAI_CIRCUIT_FAIL_THRESHOLD`
+- `PANTRY_GATEWAY_OPENAI_CIRCUIT_RESET_SECONDS`
+- `PANTRY_GATEWAY_AI_CACHE_TTL_SECONDS`
 
 ### Flutter production wiring
 Use `--dart-define=GATEWAY_API_BASE_URL=https://your-gateway-host` and set:
@@ -116,6 +123,7 @@ Mock mode still works unchanged for local demos (`USE_MOCKS=true`).
 
 - `docs/app_store_readiness.md` — screenshot checklist, privacy nutrition placeholders, release metadata, and reviewer demo flow.
 - `docs/app_icon_asset_pipeline.md` — app icon placeholder specs and bread-plane brand asset integration notes.
+- `docs/backend_observability.md` — backend metering, quotas, cache behavior, privacy-safe logs, retry/circuit-breaker fallback, and cost/failure monitoring guidance.
 
 ## Architecture at a glance
 

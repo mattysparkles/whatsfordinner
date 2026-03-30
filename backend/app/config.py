@@ -16,6 +16,13 @@ class Settings(BaseSettings):
 
     request_timeout_seconds: float = 30.0
     rate_limit_per_minute: int = 60
+    user_quota_per_hour: int = 120
+    device_quota_per_hour: int = 180
+    openai_max_retries: int = 2
+    openai_retry_backoff_seconds: float = 0.4
+    openai_circuit_fail_threshold: int = 5
+    openai_circuit_reset_seconds: int = 45
+    ai_cache_ttl_seconds: int = 600
 
 
 settings = Settings()
