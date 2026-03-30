@@ -52,6 +52,7 @@ import '../infrastructure/gateway/gateway_recipe_suggestion_service.dart';
 import '../infrastructure/mock/mock_vision_parsing_service.dart';
 import '../infrastructure/gateway/gateway_vision_parsing_service.dart';
 import '../infrastructure/gateway/pantry_gateway_client.dart';
+import '../infrastructure/vision/openai/openai_vision_parsing_service.dart';
 import '../infrastructure/auth/firebase_auth_repository.dart';
 import '../infrastructure/auth/local_auth_repository.dart';
 import '../infrastructure/cloud/account_sync_migration_service.dart';
@@ -99,8 +100,18 @@ final pantryGatewayClientProvider = Provider<PantryGatewayClient>((ref) {
 final visionParsingServiceProvider = Provider<VisionParsingService>((ref) {
   final config = ref.watch(appConfigProvider);
   final flags = ref.watch(appFeatureFlagsProvider);
-  if (config.useMocks || !flags.useProductionAiServices) return MockVisionParsingService();
-  return GatewayVisionParsingService(client: ref.watch(pantryGatewayClientProvider));
+
+  final hasOpenAiVisionConfig = config.visionApiKey.trim().isNotEmpty &&
+      config.visionApiBaseUrl.trim().isNotEmpty;
+  if (hasOpenAiVisionConfig) {
+    return OpenAiVisionParsingService(config: config);
+  }
+
+  if (!config.useMocks && flags.useProductionAiServices) {
+    return GatewayVisionParsingService(client: ref.watch(pantryGatewayClientProvider));
+  }
+
+  return MockVisionParsingService();
 });
 
 final recipeServiceProvider = Provider<RecipeSuggestionService>((ref) {

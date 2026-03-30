@@ -37,101 +37,57 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return AppScaffold(
-      title: 'Capture Ingredients',
+      title: 'Smart Capture',
       body: ListView(
         children: [
-          Text(
-            'Add one or more photos/screenshots, then review every ingredient before anything is added to inventory.',
-            style: Theme.of(context).textTheme.bodyMedium,
+          _CaptureHero(
+            totalImages: _images.length,
+            selectedSource: _selectedSource,
+            onSourceChanged: (value) => setState(() => _selectedSource = value),
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<CaptureCategory>(
-            value: _selectedSource,
-            items: CaptureCategory.values
-                .map((source) => DropdownMenuItem(value: source, child: Text(_sourceLabel(source))))
-                .toList(growable: false),
-            onChanged: (value) => setState(() => _selectedSource = value ?? _selectedSource),
-            decoration: const InputDecoration(
-              labelText: 'Source label',
-              helperText: 'Choose where these ingredients are coming from.',
-            ),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              FilledButton.icon(
-                onPressed: _isImporting ? null : () => _captureFromCamera(),
-                icon: const Icon(Icons.photo_camera),
-                label: Text(_isImporting ? 'Opening camera...' : 'Camera capture'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _isImporting ? null : () => _importFromPhotoLibrary(),
-                icon: const Icon(Icons.photo_library),
-                label: const Text('Photo library'),
-              ),
-              OutlinedButton.icon(
-                onPressed: _isImporting ? null : () => _importScreenshot(),
-                icon: const Icon(Icons.upload_file),
-                label: const Text('Screenshot upload'),
-              ),
-            ],
+          _ActionPanel(
+            isImporting: _isImporting,
+            onCameraTap: _captureFromCamera,
+            onGalleryTap: _importFromPhotoLibrary,
+            onScreenshotTap: _importScreenshot,
           ),
           if (_importErrorMessage != null) ...[
             const SizedBox(height: 12),
-            Card(
-              color: Theme.of(context).colorScheme.errorContainer,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onErrorContainer),
-                    const SizedBox(width: 8),
-                    Expanded(child: Text(_importErrorMessage!)),
-                  ],
-                ),
-              ),
-            ),
+            _ErrorCard(message: _importErrorMessage!),
           ],
           const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Session images (${_images.length})', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: 8),
-                  if (_images.isEmpty)
-                    const Text('No images added yet. Start with camera capture or photo library import.')
-                  else
-                    ..._images.map(
-                      (image) => ListTile(
-                        dense: true,
-                        leading: _CaptureThumbnail(path: image.path),
-                        title: Text(p.basename(image.path)),
-                        subtitle: Text('${_sourceLabel(image.category)} • ${_methodLabel(image.inputMethod)}'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.close),
-                          onPressed: () => setState(() => _images.removeWhere((entry) => entry.id == image.id)),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
+          _SessionPreview(
+            images: _images,
+            onRemove: (imageId) => setState(() => _images.removeWhere((entry) => entry.id == imageId)),
           ),
           const SizedBox(height: 12),
-          FilledButton(
-            onPressed: _images.isEmpty || _isParsing ? null : _parseAndReview,
-            child: Text(_isParsing ? 'Analyzing...' : 'Review detected ingredients'),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.35),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: theme.colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Next step', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 6),
+                const Text('Run AI analysis, verify each detected ingredient, then save only approved items.'),
+                const SizedBox(height: 10),
+                FilledButton.icon(
+                  onPressed: _images.isEmpty || _isParsing ? null : _parseAndReview,
+                  icon: Icon(_isParsing ? Icons.hourglass_bottom : Icons.auto_awesome),
+                  label: Text(_isParsing ? 'Analyzing images…' : 'Analyze & review ingredients'),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 8),
-          const Text(
-            'PantryPilot never treats image results as certain. You are always in control before inventory changes.',
-          ),
+          const Text('Only approved items are written to your pantry inventory.'),
         ],
       ),
     );
@@ -166,7 +122,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       await _trackCaptureSessionCreated();
     });
   }
-
 
   Future<void> _trackCaptureSessionCreated() async {
     if (_captureSessionTracked || _images.isEmpty) return;
@@ -276,6 +231,177 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   }
 }
 
+class _CaptureHero extends StatelessWidget {
+  const _CaptureHero({
+    required this.totalImages,
+    required this.selectedSource,
+    required this.onSourceChanged,
+  });
+
+  final int totalImages;
+  final CaptureCategory selectedSource;
+  final ValueChanged<CaptureCategory> onSourceChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primaryContainer,
+            theme.colorScheme.surfaceContainerHighest,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Capture what you have', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 6),
+          const Text('Snap pantry or fridge photos and turn them into editable ingredient suggestions.'),
+          const SizedBox(height: 14),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              Chip(avatar: const Icon(Icons.photo_size_select_actual_outlined, size: 18), label: Text('$totalImages image(s) queued')),
+              Chip(avatar: const Icon(Icons.place_outlined, size: 18), label: Text(_sourceLabel(selectedSource))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<CaptureCategory>(
+            value: selectedSource,
+            items: CaptureCategory.values
+                .map((source) => DropdownMenuItem(value: source, child: Text(_sourceLabel(source))))
+                .toList(growable: false),
+            onChanged: (value) {
+              if (value != null) onSourceChanged(value);
+            },
+            decoration: const InputDecoration(
+              labelText: 'Photo source',
+              helperText: 'Tagging source improves parsing context.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionPanel extends StatelessWidget {
+  const _ActionPanel({
+    required this.isImporting,
+    required this.onCameraTap,
+    required this.onGalleryTap,
+    required this.onScreenshotTap,
+  });
+
+  final bool isImporting;
+  final VoidCallback onCameraTap;
+  final VoidCallback onGalleryTap;
+  final VoidCallback onScreenshotTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Add images', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            FilledButton.icon(
+              onPressed: isImporting ? null : onCameraTap,
+              icon: const Icon(Icons.photo_camera),
+              label: Text(isImporting ? 'Opening camera…' : 'Camera'),
+            ),
+            OutlinedButton.icon(
+              onPressed: isImporting ? null : onGalleryTap,
+              icon: const Icon(Icons.photo_library),
+              label: const Text('Library'),
+            ),
+            OutlinedButton.icon(
+              onPressed: isImporting ? null : onScreenshotTap,
+              icon: const Icon(Icons.receipt_long),
+              label: const Text('Screenshot'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _SessionPreview extends StatelessWidget {
+  const _SessionPreview({required this.images, required this.onRemove});
+
+  final List<CapturedImage> images;
+  final ValueChanged<String> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Session images (${images.length})', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          if (images.isEmpty)
+            const Text('No images yet. Start with camera or library import.')
+          else
+            ...images.map(
+              (image) => ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: _CaptureThumbnail(path: image.path),
+                title: Text(p.basename(image.path)),
+                subtitle: Text('${_sourceLabel(image.category)} • ${_methodLabel(image.inputMethod)}'),
+                trailing: IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => onRemove(image.id),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: Theme.of(context).colorScheme.errorContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Icon(Icons.error_outline, color: Theme.of(context).colorScheme.onErrorContainer),
+            const SizedBox(width: 8),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _CaptureThumbnail extends StatelessWidget {
   const _CaptureThumbnail({required this.path});
 
@@ -285,10 +411,10 @@ class _CaptureThumbnail extends StatelessWidget {
   Widget build(BuildContext context) {
     final file = File(path);
     return ClipRRect(
-      borderRadius: BorderRadius.circular(6),
+      borderRadius: BorderRadius.circular(8),
       child: SizedBox(
-        width: 48,
-        height: 48,
+        width: 52,
+        height: 52,
         child: file.existsSync()
             ? Image.file(file, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_outlined))
             : const Icon(Icons.broken_image_outlined),
