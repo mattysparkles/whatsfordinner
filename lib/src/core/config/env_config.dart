@@ -8,6 +8,10 @@ class EnvConfig {
     required this.visionApiBaseUrl,
     this.recipeApiKey = '',
     this.visionApiKey = '',
+    this.visionModel = 'gpt-4.1-mini',
+    this.visionRequestTimeoutMs = 30000,
+    this.visionMaxRetries = 2,
+    this.visionLogEnabled = false,
   });
 
   final AppEnvironment environment;
@@ -16,6 +20,10 @@ class EnvConfig {
   final String visionApiBaseUrl;
   final String recipeApiKey;
   final String visionApiKey;
+  final String visionModel;
+  final int visionRequestTimeoutMs;
+  final int visionMaxRetries;
+  final bool visionLogEnabled;
 
   static EnvConfig fromDartDefines() {
     const env = String.fromEnvironment('APP_ENV', defaultValue: 'dev');
@@ -33,10 +41,14 @@ class EnvConfig {
       ),
       visionApiBaseUrl: const String.fromEnvironment(
         'VISION_API_BASE_URL',
-        defaultValue: 'https://example.com/vision',
+        defaultValue: 'https://api.openai.com/v1',
       ),
       recipeApiKey: const String.fromEnvironment('RECIPE_API_KEY'),
       visionApiKey: const String.fromEnvironment('VISION_API_KEY'),
+      visionModel: const String.fromEnvironment('VISION_MODEL', defaultValue: 'gpt-4.1-mini'),
+      visionRequestTimeoutMs: int.fromEnvironment('VISION_TIMEOUT_MS', defaultValue: 30000),
+      visionMaxRetries: int.fromEnvironment('VISION_MAX_RETRIES', defaultValue: 2),
+      visionLogEnabled: bool.fromEnvironment('VISION_LOGGING_ENABLED', defaultValue: false),
     );
   }
 }
