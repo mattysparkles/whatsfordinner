@@ -20,6 +20,8 @@ flutter pub get
 flutter run
 ```
 
+> If Flutter prints `No supported devices connected` while listing Android/Windows/Chrome devices, your project is missing generated platform folders (`android/`, `ios/`, `web/`, etc.). See **Platform folder repair** below.
+
 ### 4) Test
 ```bash
 flutter test
@@ -30,6 +32,41 @@ flutter test
 flutter analyze
 dart format --output=none --set-exit-if-changed .
 ```
+
+### 6) Platform folder repair (fixes "No supported devices connected")
+
+If your local clone only has `lib/`, `test/`, and `pubspec.yaml`, Flutter can resolve Dart packages but still cannot launch to Android/iOS/web/desktop.
+
+Run this from the project root once:
+
+```bash
+flutter create . --platforms=android,ios,web,windows,linux,macos
+```
+
+If you only need Android right now:
+
+```bash
+flutter create . --platforms=android
+```
+
+Then run:
+
+```bash
+flutter pub get
+flutter run -d <your-device-id>
+```
+
+Helpful checks:
+
+```bash
+flutter devices
+flutter doctor -v
+```
+
+Common mistakes:
+- Running `flutter create` with no output path (must be `flutter create .` from repo root).
+- Running from the wrong directory (confirm `pubspec.yaml` is in the current folder).
+- Assuming package update warnings (for newer incompatible versions) are the launch blocker. They are not blocking your current `flutter run` issue.
 
 ---
 
